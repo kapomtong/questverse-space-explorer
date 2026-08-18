@@ -43,7 +43,9 @@ QV.screens.mission = {
     const alreadyDone = planetState.zonesDone.includes(zoneIdx);
 
     return `
-      <div class="screen-mission">
+      <div class="screen-mission" data-bg="${planet.bg || ''}">
+        <div class="mission-bg"></div>
+        <div class="stars-field" aria-hidden="true"></div>
         <div class="mission-header">
           <img src="${planet.image}" alt="${planet.name}" style="width:64px;height:64px;border-radius:50%;">
           <h2>${QV.escapeHtml(planet.name)}</h2>
@@ -61,6 +63,15 @@ QV.screens.mission = {
   },
 
   mount(params) {
+    // ตั้งฉากหลังตามดาวที่เลือก (จาก data-bg)
+    const screen = document.querySelector('.screen-mission');
+    if (screen) {
+      const bg = screen.getAttribute('data-bg');
+      if (bg) {
+        const url = bg.indexOf('://') >= 0 ? bg : '../' + bg.replace(/^assets\//, '');
+        screen.style.backgroundImage = `linear-gradient(rgba(7, 8, 26, 0.72), rgba(7, 8, 26, 0.88)), url('${url}')`;
+      }
+    }
     const state = QV.state;
     const planetId = params && params.planetId || QV.currentPlanetId;
     const planetState = state.planets[planetId];
@@ -87,6 +98,8 @@ QV.screens.mission = {
     let shieldActive = false;
     let questionStartTs = Date.now();
     let answered = false;
+    let timerInterval = null;
+    let timeLeft = QV.QUESTION_TIME_LIMIT;
 
     const alreadyDone = planetState.zonesDone.includes(zoneIdx);
 
@@ -149,7 +162,7 @@ QV.screens.mission = {
 
     function showHint() {
       const q = questions[qIdx];
-      hintArea.innerHTML = q.hint ? `<div class="hint-box">${QV.escapeHtml(q.hint)}</div>` : '';
+      hintArea.innerHTML = q.hint ? `<div class="hint-box">${QV.formatFrac(QV.escapeHtml(q.hint))}</div>` : '';
     }
 
     function renderQuestion() {
@@ -163,10 +176,15 @@ QV.screens.mission = {
       questionStartTs = Date.now();
 
       questionArea.innerHTML = `
+        <div class="timer-row" id="timer-row">
+          <span class="timer-icon" id="timer-icon">⏱️</span>
+          <div class="timer-bar-track"><div class="timer-bar-fill" id="timer-bar"></div></div>
+          <span class="timer-sec" id="timer-sec">${QV.QUESTION_TIME_LIMIT}</span>
+        </div>
         <div class="question-card">
-          <div class="question-text">${QV.escapeHtml(q.q)}</div>
+          <div class="question-text">${QV.formatFrac(QV.escapeHtml(q.q))}</div>
           <div class="answers-grid">
-            ${q.choices.map((c, i) => `<button class="answer-btn" data-i="${i}">${QV.escapeHtml(c)}</button>`).join('')}
+            ${q.choices.map((c, i) => `<button class="answer-btn" data-i="${i}">${QV.formatFrac(QV.escapeHtml(c))}</button>`).join('')}
           </div>
         </div>
       `;
@@ -176,10 +194,48 @@ QV.screens.mission = {
       });
       renderDots();
       renderItems();
+      startTimer();
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timeLeft = QV.QUESTION_TIME_LIMIT;
+      updateTimerUI();
+      timerInterval = setInterval(() => {
+        timeLeft -= 0.1;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          clearInterval(timerInterval);
+          if (!answered) {
+            answered = true;
+            combo = 0;
+            QV.app.toast('⏰ หมดเวลา! ลองข้อถัดไปนะ', 'wrong');
+            setTimeout(() => {
+              qIdx++;
+              renderQuestion();
+            }, 1400);
+          }
+        }
+        updateTimerUI();
+      }, 100);
+    }
+
+    function updateTimerUI() {
+      const bar = document.getElementById('timer-bar');
+      const sec = document.getElementById('timer-sec');
+      const icon = document.getElementById('timer-icon');
+      if (!bar || !sec) return;
+      const pct = Math.max(0, (timeLeft / QV.QUESTION_TIME_LIMIT) * 100);
+      bar.style.width = pct + '%';
+      bar.style.background = timeLeft <= 10 ? 'var(--danger)' : 'linear-gradient(90deg, var(--accent-cyan), var(--success))';
+      sec.textContent = Math.ceil(timeLeft);
+      sec.style.color = timeLeft <= 10 ? 'var(--danger)' : 'var(--text)';
+      if (icon) icon.style.animation = timeLeft <= 10 ? 'pulse 0.6s infinite' : 'none';
     }
 
     function handleAnswer(i) {
       if (answered) return;
+      clearInterval(timerInterval);
       answered = true;
 
       const q = questions[qIdx];

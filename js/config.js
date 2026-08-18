@@ -17,6 +17,7 @@ QV.planets = [
     subject: "คณิตศาสตร์",
     themeColor: "#7c6ff7",
     image: "assets/planet_numberon.png",
+    bg: "assets/mission_bg_numberon.jpg",
     desc: "อาณาจักรแห่งตัวเลขและรูปทรงที่รอผู้พิชิต มาเป็นนักคำนวณผู้ยิ่งใหญ่กันเถอะ!",
     zoneCount: 5
   },
@@ -27,6 +28,7 @@ QV.planets = [
     subject: "วิทยาศาสตร์",
     themeColor: "#06d6a0",
     image: "assets/planet_bionia.png",
+    bg: "assets/mission_bg_bionia.jpg",
     desc: "โลกแห่งสิ่งมีชีวิตและธรรมชาติอันน่าอัศจรรย์ มาค้นพบความลับของจักรวาลด้วยกัน!",
     zoneCount: 5
   },
@@ -37,6 +39,7 @@ QV.planets = [
     subject: "ภาษาไทย",
     themeColor: "#ffd166",
     image: "assets/planet_aksara.png",
+    bg: "assets/mission_bg_aksara.jpg",
     desc: "ดินแดนแห่งวรรณคดีและภาษาไทยอันงดงาม มาเรียนรู้ภาษาแม่ของเราให้มีความสุขกันเถอะ!",
     zoneCount: 5
   },
@@ -47,6 +50,7 @@ QV.planets = [
     subject: "ภาษาอังกฤษ",
     themeColor: "#4cc9f0",
     image: "assets/planet_lingua.png",
+    bg: "assets/mission_bg_lingua.jpg",
     desc: "ดาวที่เต็มไปด้วยคำศัพท์และไวยากรณ์สากล มาพูดภาษาอังกฤษได้อย่างมั่นใจกันนะ!",
     zoneCount: 5
   },
@@ -57,6 +61,7 @@ QV.planets = [
     subject: "สังคมศึกษา",
     themeColor: "#f5a623",
     image: "assets/planet_civilis.png",
+    bg: "assets/mission_bg_civilis.jpg",
     desc: "ดาวแห่งประวัติศาสตร์ วัฒนธรรม และสังคมโลก มาเป็นพลเมืองที่ดีของจักรวาลด้วยกัน!",
     zoneCount: 5
   }
@@ -69,6 +74,7 @@ QV.MAX_ENERGY = 5;
 QV.XP_CORRECT = 10;
 QV.XP_COMBO = 5;
 QV.QUESTIONS_PER_ZONE = 5;
+QV.QUESTION_TIME_LIMIT = 30; // วินาทีต่อ 1 คำถาม
 QV.SAVE_KEY = "questverse_save_v1";
 
 QV.DEFAULT_ITEMS = {
@@ -336,6 +342,24 @@ QV.refreshEnergy = function(state) {
 // ========================================
 // Utility Functions
 // ========================================
+
+/**
+ * แปลงเศษส่วนในข้อความเป็น HTML แบบตั้งแนว
+ * เช่น "3/4" → จำนวนบน/เส้นขวาง/จำนวนล่าง, "2 1/2" (จำนวนคู่) → เลขคู่หน้าเศษส่วน
+ * @param {string} text - ข้อความเดิม
+ * @returns {string} - HTML ที่แปลงแล้ว
+ */
+QV.formatFrac = function(text) {
+  if (!text) return '';
+  let html = String(text)
+    // จำนวนคู่: a b/c → เลขคู่หน้าเศษส่วนตั้งแนวน
+    .replace(/(\d+) (\d+)\/(\d+)/g,
+      '<span class="mixed"><span class="mixed-num">$1</span><span class="frac"><span class="frac-n">$2</span><span class="frac-bar"></span><span class="frac-d">$3</span></span></span>')
+    // เศษส่วนธรรมดา: a/b → ตั้งแนว
+    .replace(/(\d+)\/(\d+)/g,
+      '<span class="frac"><span class="frac-n">$1</span><span class="frac-bar"></span><span class="frac-d">$2</span></span>');
+  return html;
+};
 
 /**
  * Escape HTML เพื่อป้องกัน XSS

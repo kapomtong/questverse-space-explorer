@@ -442,6 +442,67 @@ body {
 .screen-mission {
     min-height: 100vh;
     padding: 24px 16px;
+    position: relative;
+    background: linear-gradient(rgba(7, 8, 26, 0.72), rgba(7, 8, 26, 0.88)), url('../assets/mission_bg.jpg') center/cover no-repeat fixed;
+}
+/* Timer */
+.timer-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 800px;
+    margin: 0 auto 12px;
+}
+.timer-icon { font-size: 20px; }
+.timer-bar-track {
+    flex: 1;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.timer-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 10px currentColor;
+}
+.timer-sec {
+    min-width: 40px;
+    font-weight: 700;
+    font-size: 18px;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+/* เศษส่วนแบบตั้งแนว */
+.frac {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    vertical-align: middle;
+    margin: 0 3px;
+    line-height: 1.15;
+}
+.frac-n {
+    border-bottom: 2px solid currentColor;
+    padding: 0 5px 2px;
+    font-weight: 700;
+}
+.frac-d {
+    padding: 2px 5px 0;
+    font-weight: 700;
+}
+.mixed {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.mixed-num {
+    font-weight: 700;
+    font-size: 1.25em;
 }
 
 .mission-header {
@@ -497,9 +558,10 @@ body {
     margin: 0 auto 24px;
     background: rgba(18, 20, 56, 0.78);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(125, 249, 255, 0.22);
+    border: 1px solid rgba(125, 249, 255, 0.35);
     border-radius: 16px;
     padding: 32px;
+    box-shadow: 0 8px 40px rgba(125, 249, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .question-text {
@@ -518,24 +580,39 @@ body {
 }
 
 .answer-btn {
-    padding: 20px;
-    background: rgba(26, 29, 74, 0.6);
-    border: 2px solid rgba(125, 249, 255, 0.3);
-    border-radius: 12px;
+    padding: 20px 22px;
+    background: linear-gradient(135deg, rgba(15, 17, 54, 0.9), rgba(46, 42, 110, 0.85));
+    border: 2px solid rgba(125, 249, 255, 0.4);
+    border-radius: 14px;
     color: var(--text);
     font-family: 'Kanit', sans-serif;
-    font-size: 16px;
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
     text-align: left;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    position: relative;
+    overflow: hidden;
 }
-
+.answer-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--success));
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
 .answer-btn:hover {
-    background: rgba(125, 249, 255, 0.15);
+    background: linear-gradient(135deg, rgba(125, 249, 255, 0.22), rgba(110, 231, 183, 0.18));
     border-color: var(--accent-cyan);
-    transform: translateY(-2px);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 28px rgba(125, 249, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+.answer-btn:hover::after { opacity: 1; }
 
 .answer-btn.selected {
     background: rgba(125, 249, 255, 0.25);
@@ -905,4 +982,116 @@ body {
         padding: 12px 8px;
         font-size: 14px;
     }
+}
+
+/* ========================================
+   Screen — Guide (กติกาและไอเทม)
+   ======================================== */
+.screen-guide {
+    min-height: 100vh;
+    padding: 32px 16px;
+    position: relative;
+    background: linear-gradient(rgba(7, 8, 26, 0.82), rgba(7, 8, 26, 0.94)), url('../assets/mission_bg.jpg') center/cover no-repeat;
+}
+.guide-card {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 36px 32px;
+}
+.guide-card h2 {
+    font-size: clamp(24px, 4vw, 32px);
+    text-align: center;
+    margin-bottom: 8px;
+}
+.guide-sub {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.65);
+    margin-bottom: 28px;
+}
+.guide-section {
+    margin-bottom: 26px;
+}
+.guide-section h3 {
+    color: var(--accent-cyan);
+    font-size: 19px;
+    margin-bottom: 12px;
+}
+.guide-section p {
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.6;
+}
+.guide-note {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+.guide-item-card {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(125, 249, 255, 0.25);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    transition: transform 0.2s ease;
+}
+.guide-item-card:hover { transform: translateY(-2px); }
+.guide-item-icon { flex-shrink: 0; }
+.guide-item-icon img { width: 58px; height: 58px; object-fit: contain; }
+.guide-item-card h3 { font-size: 17px; margin-bottom: 2px; }
+.guide-item-card p { font-size: 14px; color: rgba(255, 255, 255, 0.7); }
+.guide-rank-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.guide-rank-emoji { font-size: 24px; }
+.guide-rank-name { font-weight: 600; flex: 1; }
+.guide-rank-xp { color: rgba(255, 255, 255, 0.55); font-size: 14px; }
+
+/* ========================================
+   Mission Background — Stars field
+   ======================================== */
+.stars-field {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+.stars-field::before,
+.stars-field::after {
+    content: '';
+    position: absolute;
+    width: 2px; height: 2px;
+    background: transparent;
+    box-shadow:
+        120px 80px 0 1px rgba(255,255,255,.6),
+        300px 200px 0 0 rgba(255,255,255,.5),
+        520px 120px 0 1px rgba(255,255,255,.45),
+        780px 300px 0 0 rgba(255,255,255,.6),
+        1050px 150px 0 1px rgba(255,255,255,.5),
+        220px 420px 0 0 rgba(255,255,255,.55),
+        640px 480px 0 1px rgba(255,255,255,.4),
+        950px 440px 0 0 rgba(255,255,255,.6),
+        1180px 380px 0 1px rgba(255,255,255,.5);
+    animation: twinkle 4s ease-in-out infinite alternate;
+}
+.stars-field::after {
+    animation-delay: -2s;
+    animation-duration: 5s;
+    box-shadow:
+        180px 340px 0 1px rgba(200,220,255,.5),
+        420px 90px 0 0 rgba(200,220,255,.6),
+        700px 260px 0 1px rgba(200,220,255,.45),
+        880px 180px 0 0 rgba(200,220,255,.55),
+        1120px 280px 0 1px rgba(200,220,255,.5),
+        340px 520px 0 0 rgba(200,220,255,.6),
+        580px 380px 0 1px rgba(200,220,255,.4);
+}
+@keyframes twinkle {
+    0% { opacity: 0.25; }
+    100% { opacity: 0.85; }
 }
