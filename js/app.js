@@ -44,11 +44,18 @@ QV.app.show = function(screenName, params) {
   }
 
   // ล้างเนื้อหาเดิม
+  // บอส/มินิเกม: เรียก cleanup ของหน้าก่อนเพื่อหยุด game loop/timers
+  if (QV.app.currentScreen && QV.app.screens[QV.app.currentScreen] &&
+      typeof QV.app.screens[QV.app.currentScreen].cleanup === 'function') {
+    try { QV.app.screens[QV.app.currentScreen].cleanup(); } catch (e) { console.error(e); }
+  }
   appContainer.innerHTML = '';
 
   // render HTML
   const html = screen.render(QV.state, params);
-  appContainer.innerHTML = html;
+  if (html != null && typeof html !== 'undefined') {
+    appContainer.innerHTML = html;
+  }
 
   // mount events
   if (screen.mount) {

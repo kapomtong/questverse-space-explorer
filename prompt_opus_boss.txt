@@ -1,0 +1,90 @@
+คุณคือ Senior HTML5 Game Developer (Vanilla JS ไม่มี framework, ไม่มี Canvas library) จงเขียนไฟล์ใหม่ `js/boss.js` สำหรับเกม QuestVerse Space Explorer (เกมค้นหาความรู้ ม.1 ภาษาไทย)
+
+# หน้าที่
+เพิ่ม Screen: `QV.screens.boss = { render(state, params), mount(params) }` — โหมด Boss Battle ที่ผู้เล่นเดินจริง หลบท่าโจมตีบอส และเดินไปยืนบน "ป้ายคำตอบ" ที่ถูกเพื่อตอบคำถาม
+
+# Contract กับระบบเดิม (ต้องทำตามนี้เป๊ะ)
+1. Register: `QV.screens.boss = {...}` แบบเดียวกับ minigame.js — มี `render(state, params)` และ `mount(params)` ที่สร้าง DOM ใส่ `#app` (container id=`screen-boss`) แล้วลบ element เดิมออก
+2. state: อ่าน/เขียนผ่าน `QV.state` (global object) และ `QV.saveState(QV.state)` — โครงสร้าง state มี: `state.player.name`, `state.player.suit` ('red'|'green'|'blue'), `state.xp` (number), `state.energy` (0-5), `state.badges` (array of badge id strings), `state.items` (shield, compass, telescope), `state.minigamePlays`
+3. XP: เขียน XP เข้า `state.xp += n` แล้วเรียก `QV.saveState(QV.state)` + แสดง toast "XP +n!"
+4. Badge: `state.badges.push('boss_mathos')` / `'boss_chronos'` — badge def มีอยู่ใน config.js (bossMathos, bossChronos)
+5. ใช้ helper `QV.formatFrac(str)` เมื่อ text คำถาม/คำตอบเป็นเศษส่วน (เช่น "2/5") — คืน HTML ส่วนประกอบ fraction ถ้า input เป็นเศษส่วน; ใช้ `QV.toast(msg)` แสดง toast
+6. คำถาม: สุ่มจาก `QV.QUESTIONS[planetId][zoneIdx][qIdx]` — format: `{q, choices[4], answerIdx, hint}`
+   - planetIds: numberon, bionia, aksara, lingua, civilis
+   - โหมดบอส: สุ่มคำถามคละทุกดาวทุกโซน 10 ข้อต่อบอส (ไม่ซ้ำข้อ)
+7. ปมกับ: `<button id="btn-map-boss">ท้าบอส</button>` จะถูกเพิ่มใน galaxy_map.js (เราทำเอง) — เมื่อกด: `QV.app.show('boss', { boss: 'mathos' })` หรือ `'chronos'`
+
+# Assets (ภาพมีให้แล้ว ใช้ path ตามนี้)
+- บอส 1: `assets/boss_mathos.webp` (512x512 โปร่งใส) — หุ่นยนต์พิชิตสีม่วง ตาแดงเรือง
+- บอส 2: `assets/boss_chronos.webp` (512x512 โปร่งใส) — มังกรนาฬิกาทอง
+- ท่าโจมตี: `assets/boss_fireball.webp`, `assets/boss_ice.webp`, `assets/boss_portal.webp` (256 โปร่งใส)
+- ฉาก: `assets/boss_arena.jpg` (1280x720 สนามรบหินลอยอวกาศ — 4 แผ่นหิน 2x2 ตรงกลางล่าง)
+- ผู้เล่น: ใช้ภาพสูทเดิม `assets/suit_red.webp` / `suit_green.webp` / `suit_blue.webp` ตาม `state.player.suit`
+
+# Gameplay (ละเอียด)
+## สนาม
+- จอเต็มหน้าจอ (100vw x 100vh), overflow:hidden
+- ฉากหลัง: boss_arena.jpg ขนาด cover
+- **4 ป้ายคำตอบ 2x2** อยู่ครึ่งขวาล่างของสนาม (ตำแหน่ง % ของจอ:
+  - ป้าย 0: ซ้ายบน {x:55%, y:55%}, ป้าย 1: ขวาบน {x:75%, y:55%}
+  - ป้าย 2: ซ้ายล่าง {x:55%, y:72%}, ป้าย 3: ขวาล่าง {x:75%, y:72%})
+  - แต่ละป้าย = วงกลม/แป้น หินสุ่งแสง (CSS radial-gradient + box-shadow) แสดงตัวเลขน/เศษส่วนในป้าย
+- **บอส** อยู่ครึ่งบนซ้าย (x:12%, y:15%) ขนาด ~30vw (max 260px) มี idle animation (ลอยขึ้น-ลง breathing 3s ease-in-out infinite)
+- **ผู้เล่น** ตัวละครขนาด ~8vw (max 70px) เดินได้ทั่วสนาม (ขอบเขต 2%-94%)
+
+## การเดิน ( Movement)
+- Desktop: WASD / Arrow Keys, ความเร็วเดิน ~320px/s (เทียบกับจอกว้าง 1280)
+- Mobile: **Virtual Joystick** วงกลมโปร่งใส มุมซ้ายล่าง (วงนอก 120px วงใน 50px) — drag วงในแล้วปล่อย = stop, คำนวณ vector จาก displacement
+- ผู้เล่นหันหน้าตามทิศเดิน (flipX เมื่อเดินซ้าย)
+- อนิเมชันเดิน: bob 0.12s stride (translateY ±3px + rotate ±2deg) เมื่อเคลื่อนที่ — ใช้ CSS transition/animation หรือ JS requestAnimationFrame
+- อนิเมชันโดนโจมตี: flash แดง 0.3s + knockback 60px + shake (translateX ±8px 3 ครั้ง)
+
+## ระบบคำถาม
+- บอสถาม 10 ข้อต่อบอส; ข้อละ 30 วิ (countdown แสดงมุมบน)
+- สุ่มคำถาม 10 ข้อไม่ซ้ำ สุ่มตำแหน่ง 4 คำตอบลง 4 ป้าย (answer pad ที่ถูก = ยืนแล้วถูก)
+- ผู้เล่นยืนบนป้าย (AABB collide: ระยะหัวใจ 2 รัศมีป้าย ~4vw) นาน 0.4s = "ตอบข้อนั้น"
+- ถูก: บอสโดนเสียงสะเทือน (scale 1.0→0.92→1.05→1, 0.3s) + damagebar บอสลดลง + XP +15 + combo
+- ผิด: ผู้เล่นโดนโจมตี (flash+knockback+shake) −1 ❤️ + hint แสดง 3 วิ
+- หลงจังหวัง: ถ้าไม่ตอบภายใน 30 วิ = ผิดโดยอัตโนมัติ (−1 ❤️) + ข้อถัดไป
+
+## ท่าโจมตีบอส (สุ่มท่าทุก 3-5 วิ ขณะยังไม่ได้ตอบ)
+1. `fireball`: ภาพ boss_fireball.webp บินจากบอสไปยังตำแหน่งผู้เล่นปัจจุบัน (linear 0.8s) — ถ้าชนผู้เล่น (รัศมี 4vw) = −1 ❤️ + knockback; ถ้าหลบได้ = คอมโบขึ้น
+2. `ice`: ภาพ boss_ice.webp ร่วงลงมาจากด้านบน 3 ก้อน (x สุ่ม 20%-90%) ตก 1.2s — ถ้ายืนโดน = −1 ❤️ + freeze ชลัว 1.5s (เดินไม่ได้)
+3. `portal`: ภาพ boss_portal.webp ปรากฏใต้ผู้เล่น (scale 0→1, 0.5s) + วงสีแดงกว้างขึ้น — 3 วิหลัง portal เปิด = ดูด (−1 ❤️) ถ้าไม่เดินหนีออกจากวง (รัศมี 6vw)
+- ขณะโจมตี บอสมี "เตือนล่วงหน้า" 0.7-1.5s: fireball = charge line แดง, ice = เงาตก, portal = วงแดงกว้างขึ้น
+- ท่าไม่ชนถ้าผู้เล่น dodge ได้ = +5 XP "Dodged!" toast
+
+## HUD
+- มุมบนซ้าย: ❤️ × energy (จาก state), XP bar
+- มุมบนกลาง: คำถาม (ข้อที่ n/10) + timer bar
+- มุมบนขวา: HP บอส (bar สีแดง 10 ช่อง หมด = ชนะ)
+- มุมล่างซ้าย: joystick (เฉพาะ touch), มุมล่างขวา: ปุ่ม ⬌⬍ ป๊อป (สำรอง)
+- ปุ่ม ให้ข้อความ prompt เต็ม: "⚠️ บอสโจมตี!" เมื่อมี project tile มาถึง
+
+## Win / Lose
+- ชนะ (ตอบถูก 10 ข้อ หรือ HP บอสหมด): จบเกม → badge (boss_mathos/boss_chronos), XP +200, confetti CSS, ปุ่ม "กลับแผนที่" (QV.app.show('map'))
+- แพ้ (❤️ = 0): XP +30 ปลอบใจ, ปุ่ม "ลองใหม่" / "กลับแผนที่"
+- ใช้ animation-end / event delegation กัน double-count — state machine: 'question' → 'dodge' → 'answer' → 'next'
+- mount() ต้อง clear ทุก timer/interval/raf เมื่อออกจากหน้า (on screen change: unregister via beforeShow hook — ให้ boss.js register `QV.app.onScreenChange = fn`? ให้ง่าย: hook global `QV.screens.boss.cleanup = fn` ที่ mount() ตั้งไว้ และ app.show() เรียก cleanup ของ screen ก่อนหน้าถ้ามี — ให้เขียนทั้ง boss.js และแก้ js/app.js บรรทัดเล็ก: ใน QV.app.show() ก่อน swap ให้เรียก cleanup ของ currentScreen ถ้ามี)
+
+# Responsive / Mobile
+- ใช้ %/vw/vh ทั้งหมด ไม่มี px ตายตัว (ยกเว้น joystick)
+- touch-action: none บนสนาม + joystick
+- จอ < 500px กว้าง: ผู้เล่น 10vw, ป้าย 8vw, joystick 100px
+- preventDefault บน touch ทั้งหมดในสนาม
+
+# โครงสร้างไฟล์
+1. สร้าง `js/boss.js` ไฟล์เดียว (~800-1200 บรรทัด) — จัดระเบียบเป็น comment block ชัดเจน: // === CONFIG / STATE / DOM / LOOP / MOVEMENT / ATTACKS / QUESTIONS / HUD / WIN-LOSE
+2. แก้ `js/app.js` เล็กน้อย: ใน QV.app.show() เพิ่ม `if (QV.app.screens[QV.app.currentScreen] && QV.app.screens[QV.app.currentScreen].cleanup) QV.app.screens[QV.app.currentScreen].cleanup();`
+3. สร้าง CSS block ใหม่ `/* ===== BOSS BATTLE ===== */` ใส่ไฟล์ `style.css` ท้ายไฟล์ — คลาส: .screen-boss, .boss-arena, .boss-sprite, .player-sprite, .answer-pad, .hud-boss, .joystick, .atk-tile, .warn-line ฯลฯ (อนิเมชัน keyframes: boss-idle, player-walk, hit-shake, tile-fly, pad-glow, confetti)
+4. เพิ่ม `<script src="js/boss.js"></script>` ใน index.html หลัง minigame.js ก่อน leaderboard.js
+
+# ห้าม
+- ห้ามใช้ Canvas API (ใช้ DOM + CSS transforms ได้ความ smooth) — ไม่ใช้ requestAnimationFrame เกิน 1 loop
+- ห้าม import/require ไลบรารีนอก
+- ห้ามสร้างคำถามเอง — สุ่มจาก QV.QUESTIONS เท่านั้น
+- ห้ามเปลี่ยน contract ของ minigame/mission/galaxy_map เดิม
+- ไม่ต้อง gen ภาพ — ภาพมีให้แล้วตาม path ข้างบน
+
+# Output
+เขียนโค้ดครบทั้ง 4 ส่วน (boss.js, แก้ app.js, แก้ style.css, แก้ index.html) ใน markdown code blocks แยกไฟล์ พร้อม comment อธิบายส่วนสำคัญ

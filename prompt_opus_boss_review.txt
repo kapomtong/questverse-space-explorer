@@ -1,0 +1,28 @@
+คุณคือ Code Reviewer มืออาชีพ ตรวจไฟล์ js/boss.js ของเกม QuestVerse (Vanilla JS, เกมอวกาศเด็ก ม.1) — โหมด Boss Battle
+
+## Context
+- ไฟล์: js/boss.js (1101 บรรทัด) — screen boss, mount/cleanup/render
+- Player เดิน WASD + joystick (mobile), 4 ป้ายคำตอบ 2x2, ยืนบนป้ายถูก 400ms = ตอบถูก → bossHp-1
+- บอสโจมตี 3 แบบ: fireball (ยิงหา player), ice (เตือนแล้วตก), portal (spawn แล้ว 3.5s ทำลายพื้นที่)
+- energy=0 → lose → heal 1 → end screen; bossHp=0 → win → badge + 200XP
+
+## สถานะ QA ที่ทดสอบแล้ว (pass)
+- Movement แกนเดี่ยว 24%/s ✓, diagonal normalize ✓
+- Pad collision ใช้ distance(%viewport) แปลงเป็น vw ✓
+- Correct flow: hp ลด ✓, timer reset ✓, คำถามถัดไป ✓
+- Lose/heal/end screen ✓, timeout = wrong ✓
+- Balance: FIRST_ATTACK_DELAY=6000, interval 5000-8000ms, ตอบถูก +1 energy (max 5), PAD_RADIUS=7vw, HOLD=400ms
+
+## สิ่งที่ต้องการจากคุณ
+ตรวจ boss.js รอบสุดท้าย — หาบั๊กที่อาจหลุด:
+1. Memory leak: timers/RAF/listener หลัง cleanup — ตรวจ mount ซ้ำ 2 ครั้งจะมีปัญหาไหม
+2. Race condition: loadQuestion ขณะ player ยืนบน pad — holding logic ถูกไหม
+3. Edge case: formatFrac แปลงเศษส่วนในคำถาม → DOM textContent อาจไม่ตรง (เช่น '2/5 + 1/5' → '25 + 15') — ตรวจว่า collision/hint ทำงานถูกไหม
+4. Logic: endGame ทำงานตอน energy=0 หรือ bossHp=0 — ตรวจว่า stop loop ครบ (clearInterval, cancelAnimationFrame, removeEventListener)
+5. Balance: fireball ยิงหา player — travel time ช้าพอให้ dodge ไหม
+6. โจทย์: คำถามสุ่ม 10 ข้อจาก 125 — ตรวจว่าไม่ซ้ำกันไหม
+7. Performance: gameLoop ทุก frame — มีอะไรใน loop ที่ควร optimize ไหม
+
+## Output
+- รายการบั๊ก/ปัญหาที่พบ พร้อมบรรทัดอ้างอิง และแนวทางการแก้ (เขียนโค้ดแก้เฉพาะจุดที่จำเป็น)
+- ถ้าไม่พบปัญหา → บอกว่าผ่าน

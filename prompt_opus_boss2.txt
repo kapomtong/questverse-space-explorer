@@ -1,0 +1,14 @@
+ในคำตอบก่อนหน้า โค้ด js/boss.js ถูกตัดกลาง — บรรทัดสุดท้ายที่ได้มาคือ:
+```
+    rafId = null;
+    attackTimer = null;
+    timer
+```
+จงเขียนส่วนที่เหลือของ js/boss.js ต่อจากบรรทัดนั้น:
+1. บรรทัดที่เหลือใน cleanup() (timerInterval clear + removeEventListener joystick events + container.remove)
+2. ส่วนที่ขาด: register screen — `if (typeof QV !== 'undefined' && QV.app) { QV.app.screens.boss = { render, mount, cleanup }; }` + window.QVBossTest = mount (เผื่อ debug)
+3. ปิด IIFE ด้วย })();
+4. จากนั้นให้เพิ่ม CSS block ใหม่ `/* ===== BOSS BATTLE ===== */` ทั้งหมดที่ต้องใช้ (ไฟล์ style.css ท้ายไฟล์) — คลาสครบ: .screen-boss, .boss-arena, .boss-sprite, .player-sprite, .answer-pad, .answer-pad .pad-label, .hud-boss*, .hud-hp-bar, .hud-hp-fill, .hud-timer-bar, .hud-timer-fill, .hud-combo, .joystick, .joystick-inner, .atk-tile, .atk-tile.fireball, .atk-tile.ice, .atk-tile.portal, .warn-ring, .confetti*, .hit-flash, .freeze-overlay ฯลฯ + keyframes: boss-idle, player-walk, hit-shake, tile-fly, pad-glow, pad-correct, pad-wrong, confetti-fall, fadeIn, fadeOut, pulse-red
+5. index.html: เพิ่ม <script src="js/boss.js"></script> หลัง js/minigame.js
+6. galaxy_map.js: เพิ่มปุ่ม "👹 ท้าบอส" (id=btn-map-boss) ในหน้าแผนที่ — แสดงเมื่อบอส mathos/chronos ยังไม่ชนะ (state.bossDefeated) — กดแล้ว QV.app.show('boss', {boss:'mathos'}) / 'chronos' — ถ้าชนะหมดแล้วแสดง "พิชิตครบแล้ว 🏆"
+ส่งเป็น markdown code blocks แยกไฟล์

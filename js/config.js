@@ -195,6 +195,18 @@ QV.badges = [
     name: "Speed Runner",
     desc: "ตอบถูกใน 5 วินาที 10 ครั้ง",
     icon: "⚡"
+  },
+  {
+    id: "boss-mathos",
+    name: "ผู้พิชิต Mathos",
+    desc: "เอาชนะ Mathos หุ่นพิชิต ในโหมด Boss Battle",
+    icon: "🤖"
+  },
+  {
+    id: "boss-chronos",
+    name: "ผู้พิชิต Chronos",
+    desc: "เอาชนะ Chronos มังกรนาฬิกา ในโหมด Boss Battle",
+    icon: "🐉"
   }
 ];
 
@@ -246,6 +258,7 @@ QV.newState = function() {
       telescope: 2
     },
     badges: [],
+    bossDefeated: [], // id บอสที่พิชิตแล้ว ['mathos'|'chronos']
     fastCorrect5s: 0,
     minigamePlays: {}
   };

@@ -75,6 +75,34 @@ QV.screens.map = {
       `;
     }).join('');
 
+    // ===== ส่วนท้าบอส =====
+    const bossDefeated = Array.isArray(state.bossDefeated) ? state.bossDefeated : [];
+    const bossDefs = [
+      { id: 'mathos', name: 'Mathos the Calculator', img: 'assets/boss_mathos.webp', tag: 'บอสพิชคณิต • 10 คำถาม • XP 200' },
+      { id: 'chronos', name: 'Chronos the Timekeeper', img: 'assets/boss_chronos.webp', tag: 'บอสแห่งเวลา • 10 คำถาม • XP 200' }
+    ];
+    const bossCardsHtml = bossDefs.map(boss => {
+      const defeated = bossDefeated.includes(boss.id);
+      return `
+        <div class="boss-card">
+          ${defeated ? '<div class="boss-defeated-stamp">✅ พิชิตแล้ว</div>' : ''}
+          <img src="${boss.img}" alt="${boss.name}" class="boss-img">
+          <div class="boss-info">
+            <div class="boss-name">${boss.name}</div>
+            <div class="boss-tag">${boss.tag}</div>
+            <button class="boss-challenge-btn" data-boss="${boss.id}" id="btn-map-boss-${boss.id}">
+              ${defeated ? '🔁 ท้าชิงต่อ' : '⚔️ ท้าประจัญ!'}
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    const bossSectionHtml = `
+      <div class="boss-section">
+        ${bossCardsHtml}
+      </div>
+    `;
+
     return `
       <div class="screen-map">
         <div class="map-header">
@@ -88,6 +116,7 @@ QV.screens.map = {
         <div class="planets-grid">
           ${planetsHtml}
         </div>
+        ${bossSectionHtml}
       </div>
     `;
   },
@@ -105,6 +134,17 @@ QV.screens.map = {
     // ปุ่มฟื้นพลังงานจากมินิเกม (แสดงเฉพาะ energy <= 0)
     const btnMg = document.getElementById('btn-map-minigame');
     if (btnMg) btnMg.addEventListener('click', () => QV.app.show('minigame'));
+
+    // ปมท้าบอส (Mathos / Chronos)
+    ['mathos', 'chronos'].forEach(bossId => {
+      const btnBoss = document.getElementById('btn-map-boss-' + bossId);
+      if (btnBoss) {
+        btnBoss.addEventListener('click', (e) => {
+          e.stopPropagation();
+          QV.app.show('boss', { boss: bossId });
+        });
+      }
+    });
 
     // ปุ่ม reset
     const btnReset = document.getElementById('btn-reset');
@@ -156,8 +196,8 @@ QV.screens.map = {
       const prevPlanet = QV.planets[currentPlanetIndex - 1];
       const prevPlanetState = state.planets[prevPlanet.id];
       
-      // ดาวก่อนหน้าต้องผ่านครบ 5 โซน
-      if (!prevPlanetState || prevPlanetState.zonesDone.length < 5) {
+      // ดาวก่อนหน้าต้องผ่านอย่างน้อย 1 โซน (จบโซนแรกก็ปลดดาวถัดไปได้ เพื่อความสนุก ไม่ต้องรอครบ 5 โซน)
+      if (!prevPlanetState || prevPlanetState.zonesDone.length < 1) {
         return true;
       }
     }
