@@ -210,6 +210,11 @@ class BossBattle {
       <div class="camping-warning" style="display: none;">⚠️ อย่ายืนนิ่ง!</div>
     `;
     arena.appendChild(hud);
+    // Question bar
+    const qbar = document.createElement('div');
+    qbar.className = 'boss-question-bar';
+    qbar.innerHTML = '<span id="boss-q-text">กำลังโหลดคำถาม...</span>';
+    arena.appendChild(qbar);
 
     // Player
     const player = document.createElement('div');
@@ -377,6 +382,8 @@ class BossBattle {
     const q = this.questionPool.splice(Math.floor(Math.random() * this.questionPool.length), 1)[0];
     this.usedQuestions.add(q.q);
     this.gameState.currentQuestion = q;
+    const qText = this.arenaEl.querySelector('#boss-q-text');
+    if (qText) qText.innerHTML = typeof QV.formatFrac === 'function' ? QV.formatFrac(QV.escapeHtml(q.q)) : QV.escapeHtml(q.q);
 
     // Select 4 pad slots
     const slots = this.selectPadSlots();
