@@ -1,1340 +1,1126 @@
-// ===== BOSS BATTLE SYSTEM =====
-// Screen: boss battle - ผู้เล่นเดินหลบท่าโจมตี และยืนบนป้ายคำตอบ
-
-(function() {
-  'use strict';
-
-  // ===== CONFIG =====
-  const CONFIG = {
-    // Movement
-    PLAYER_SPEED: 24, // % of arena width per second (ลดลงให้เด็กควบคุมได้
-    ARENA_BOUNDS: { minX: 2, maxX: 94, minY: 2, maxY: 94 }, // % of viewport
-    
-    // Collision
-    PLAYER_RADIUS: 2.2, // vw (ชนจริง ≈ 20px)
-    PAD_RADIUS: 4.5, // vw (ป้ายคำตอบ — ขนาดจริงของป้าย)
-    PAD_ANSWER_CORE: 2.2, // vw — แกนกลางป้ายที่นับว่า "ตั้งใจยืนตอบ" (ไม่ตอบเองทั้งที่เดินผ่าน)
-    PAD_MIN_DISTANCE: 18, // vw — ระยะห่างขั้นต่ำระหว่างป้าย (กันป้ายซ้อน/บังกัน)
-    ATTACK_RADIUS: 2.5, // vw
-    
-    // Timing
-    FIRST_ATTACK_DELAY: 6000, // ms — ให้เวลา 6 วิแรกก่อนบอสโจมตีครั้งแรก
-    QUESTION_TIME: 30, // วินาที
-    ANSWER_HOLD_TIME: 800, // ms ที่ต้องยืนบนป้าย (ป้องกันตอบเองทั้งที่เดินผ่าน)
-    MOVING_THRESHOLD: 0.15, // normalized speed (vx/vy = -1..1) — ต่ำกว่านี้นับว่า "หยุดยืน" (ตั้งใจตอบ)
-    CAMPING_TIME: 4500, // ms — ยืนแช่ (ไม่บนป้าย) นานเกินนี้ถือว่า camping
-    CAMPING_ATTACK_DELAY: 1200, // ms — บอสจะยิงไฟลูกใส่ camper หลังเตือน
-    ATTACK_INTERVAL_MIN: 5000, // ms (เริ่มช้า ให้เวลาคิด)
-    ATTACK_INTERVAL_MAX: 8000,
-    
-    // Damage
-    BOSS_HP: 10,
-    ATTACK_DAMAGE: 1,
-    CORRECT_XP: 15,
-    DODGE_XP: 5,
-    WIN_XP: 200,
-    LOSE_XP: 30,
-    
-    // Answer pads slots — 8 ตำแหน่งกระจายรอบสนาม (สุ่ม 4 จุดทุกข้อ)
-    PAD_SLOTS: [
-      { x: 15, y: 40 }, // ซ้ายบน
-      { x: 40, y: 30 }, // กลางบน
-      { x: 70, y: 30 }, // ขวาบน
-      { x: 85, y: 45 }, // ขวากลาง
-      { x: 15, y: 70 }, // ซ้ายล่าง
-      { x: 40, y: 80 }, // กลางล่าง
-      { x: 70, y: 80 }, // ขวาล่าง
-      { x: 85, y: 65 }  // ขวากลางล่าง
-    ],
-    PADS: [] // จะถูกสุ่มใน runtime
-  };
-
-  const BOSS_DATA = {
-    mathos: {
-      name: 'Mathos the Calculator',
-      image: 'assets/boss_mathos.webp',
-      badgeId: 'boss-mathos',
-      x: 12, y: 15
+const BOSS_CONFIGS = {
+  mathos: {
+    id: 'mathos',
+    name: 'Mathos',
+    subject: 'math',
+    difficulty: 1,
+    requiredXP: 0,
+    arenaBg: 'assets/boss_arena.jpg',
+    bossImg: 'assets/boss_mathos.webp',
+    introCutIn: 'จงพิสูจน์ความสามารถทางคณิตศาสตร์ของเจ้า!',
+    victoryMsg: 'เจ้าเข้าใจหลักการคณิตศาสตร์อย่างแท้จริง',
+    defeatMsg: 'กลับไปฝึกฝนพื้นฐานเพิ่มเติมก่อน',
+    attackTheme: {
+      fireball: { color: '#E9A568', name: 'สมการลูกไฟ' },
+      ice: { color: '#38BDF8', name: 'โซนแช่แข็งตัวเลข' },
+      portal: { color: '#A78BFA', name: 'ประตูมิติคณิต' }
     },
-    chronos: {
-      name: 'Chronos the Timekeeper',
-      image: 'assets/boss_chronos.webp',
-      badgeId: 'boss-chronos',
-      x: 12, y: 15
+    baseDifficulty: {
+      attackInterval: 4500,
+      firstAttackDelay: 5000
     }
-  };
-
-  const ATTACK_TYPES = ['fireball', 'ice', 'portal'];
-
-  // ===== STATE =====
-  let gameState = {
-    boss: null,
-    bossHp: CONFIG.BOSS_HP,
-    questions: [],
-    currentQIdx: 0,
-    timer: CONFIG.QUESTION_TIME,
-    combo: 0,
-    
-    player: { x: 40, y: 80, vx: 0, vy: 0, facingLeft: false, frozen: false },
-    
-    attacks: [], // { type, x, y, vx, vy, startTime, warned }
-    
-    padHoldStart: null,
-    padHoldIdx: null,
-    padPositions: [], // เก็บพิกัด x,y ปัจจุบันของป้าย 0-3
-    
-    // Anti-camping system
-    campingDetection: {
-      lastPos: { x: 57.5, y: 88 },
-      stillStartTime: null,
-      warned: false,
-      attackScheduled: false
+  },
+  chronos: {
+    id: 'chronos',
+    name: 'Chronos',
+    subject: 'science',
+    difficulty: 2,
+    requiredXP: 100,
+    arenaBg: 'assets/boss_arena.jpg',
+    bossImg: 'assets/boss_chronos.webp',
+    introCutIn: 'เวลาและวิทยาศาสตร์คือกฎของข้า!',
+    victoryMsg: 'เจ้าควบคุมเวลาและวิทยาศาสตร์ได้แล้ว',
+    defeatMsg: 'เวลาของเจ้ายังไม่มาถึง',
+    attackTheme: {
+      fireball: { color: '#6EE7B7', name: 'พลังงานควอนตัม' },
+      ice: { color: '#38BDF8', name: 'ห้องแช่แข็งเวลา' },
+      portal: { color: '#8B5CF6', name: 'รอยแยกเวลา' }
     },
+    baseDifficulty: {
+      attackInterval: 4000,
+      firstAttackDelay: 4500
+    }
+  },
+  kawi: {
+    id: 'kawi',
+    name: 'Kawi',
+    subject: 'thai',
+    difficulty: 3,
+    requiredXP: 250,
+    arenaBg: 'assets/arena_kawi.webp',
+    bossImg: 'assets/boss_kawi.webp',
+    introCutIn: 'ภาษาไทยคือศิลปะแห่งปัญญา พิสูจน์ให้ข้าเห็น!',
+    victoryMsg: 'เจ้าเชี่ยวชาญภาษาไทยอย่างแท้จริง',
+    defeatMsg: 'ภาษาไทยลึกซึ้งกว่าที่เจ้าคิด',
+    attackTheme: {
+      fireball: { color: '#F59E0B', name: 'คำอักษรเพลิง' },
+      ice: { color: '#3B82F6', name: 'โซนคำศัพท์น้ำแข็ง' },
+      portal: { color: '#EC4899', name: 'ประตูวรรณคดี' }
+    },
+    baseDifficulty: {
+      attackInterval: 3500,
+      firstAttackDelay: 4000
+    }
+  },
+  lex: {
+    id: 'lex',
+    name: 'Lex',
+    subject: 'english',
+    difficulty: 4,
+    requiredXP: 450,
+    arenaBg: 'assets/arena_lex.webp',
+    bossImg: 'assets/boss_lex.webp',
+    introCutIn: 'Your vocabulary shall be tested to its limits!',
+    victoryMsg: 'Your command of English is truly impressive',
+    defeatMsg: 'More practice with English is needed',
+    attackTheme: {
+      fireball: { color: '#EF4444', name: 'Vocabulary Blast' },
+      ice: { color: '#06B6D4', name: 'Grammar Freeze Zone' },
+      portal: { color: '#8B5CF6', name: 'Literature Portal' }
+    },
+    baseDifficulty: {
+      attackInterval: 3000,
+      firstAttackDelay: 3500
+    }
+  },
+  terra: {
+    id: 'terra',
+    name: 'Terra',
+    subject: 'social',
+    difficulty: 5,
+    requiredXP: 700,
+    arenaBg: 'assets/arena_terra.webp',
+    bossImg: 'assets/boss_terra.webp',
+    introCutIn: 'โลกและสังคมรอการพิสูจน์จากเจ้า!',
+    victoryMsg: 'เจ้าเข้าใจโลกและสังคมอย่างลึกซึ้ง',
+    defeatMsg: 'โลกใบนี้ซับซ้อนกว่าที่เจ้าเข้าใจ',
+    attackTheme: {
+      fireball: { color: '#10B981', name: 'ลูกโลกเพลิง' },
+      ice: { color: '#0EA5E9', name: 'โซนแช่แข็งภูมิศาสตร์' },
+      portal: { color: '#A855F7', name: 'ประตูประวัติศาสตร์' }
+    },
+    baseDifficulty: {
+      attackInterval: 2500,
+      firstAttackDelay: 3000
+    }
+  }
+};
+
+const CONFIG = {
+  PAD_SLOTS: [
+    { left: 15, top: 20 },
+    { left: 75, top: 25 },
+    { left: 10, top: 60 },
+    { left: 85, top: 65 },
+    { left: 40, top: 15 },
+    { left: 60, top: 75 },
+    { left: 25, top: 80 },
+    { left: 70, top: 45 }
+  ],
+  PAD_MIN_DISTANCE: 18,
+  PLAYER_SPEED: 0.4,
+  INTENTIONAL_THRESHOLD: 0.15,
+  INTENTIONAL_DURATION: 800,
+  CAMPING_WARNING_TIME: 4500,
+  WIN_AT: 10, // ตอบถูก 10 ข้อ = ชนะบอส
+  FIREBALL_SPEED: 0.25,
+  ICE_DURATION: 3000,
+  PORTAL_WARP_DELAY: 1500,
+  COMBO_DASH_THRESHOLD: 3,
+  COMBO_INVINCIBLE_THRESHOLD: 10
+};
+
+class BossBattle {
+  constructor(root, bossId) {
+    this.root = root;
+    this.config = BOSS_CONFIGS[bossId];
+    if (!this.config) throw new Error(`Boss ${bossId} not found`);
+
+    this.gameState = {
+      player: { x: 50, y: 50, vx: 0, vy: 0, hp: 3, frozen: false, shielded: false },
+      bossHP: 100,
+      score: 0,
+      combo: 0,
+      questionCount: 0,
+      correctStreak: 0,
+      correctCount: 0,
+      keys: {},
+      joystick: { active: false, dx: 0, dy: 0 },
+      pads: [],
+      currentQuestion: null,
+      attacks: [],
+      events: [],
+      campingTimer: 0,
+      campingWarning: false,
+      lastPosition: { x: 50, y: 50 },
+      item: QV.state.boss?.item_selected || null,
+      itemUsed: false,
+      timeLimit: 0,
+      timeRemaining: 0,
+      maxCombo: 0,
+      pet: { x: 50, y: 50, bobOffset: 0 }
+    };
+
+    this.intentionalState = { padIndex: -1, timer: 0 };
+    const options = arguments[2] || {};
+    if (options.timeLimit) {
+      this.gameState.timeLimit = options.timeLimit;
+      this.gameState.timeRemaining = options.timeLimit;
+    }
+    this.onAnswerCallback = options.onAnswer || null;
+    this.onTimeUpCallback = options.onTimeUp || null;
+    this.rafId = null;
+    this.running = false;
+    this.lastTime = 0;
+    this.attackTimer = 0;
+    this.eventTimer = 0;
+    this.questionPool = [];
+    this.usedQuestions = new Set();
+
+    // Shield item: กันดาเมจครั้งแรก
+    if (this.gameState.item === 'shield') this.gameState.player.shielded = true;
+  }
+
+  mount() {
+    this.root.innerHTML = '';
     
-    phase: 'question', // question | answer | win | lose
+    // Arena
+    const arena = document.createElement('div');
+    arena.className = 'boss-arena';
+    arena.style.cssText = `
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: url('${this.config.arenaBg}') center/cover;
+      overflow: hidden;
+    `;
+
+    // HUD
+    const hud = document.createElement('div');
+    hud.className = 'boss-hud';
+    hud.innerHTML = `
+      <div class="boss-hp-bar">
+        <div class="boss-hp-fill" style="width: 100%; background: ${this.config.attackTheme.fireball.color};"></div>
+        <span class="boss-name">${this.config.name}</span>
+      </div>
+      <div class="player-hp">
+        ${Array(3).fill('<div class="hp-heart">♥</div>').join('')}
+      </div>
+      <div class="combo-counter" style="display: none;">Combo: <span>0</span></div>
+      <div class="camping-warning" style="display: none;">⚠️ อย่ายืนนิ่ง!</div>
+    `;
+    arena.appendChild(hud);
+
+    // Player
+    const player = document.createElement('div');
+    player.className = 'boss-player';
+    player.style.cssText = `
+      position: absolute;
+      width: 3vw;
+      height: 3vw;
+      background: radial-gradient(circle, #FFD700, #FFA500);
+      border-radius: 999px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transition: box-shadow 0.3s;
+      z-index: 10;
+    `;
+    arena.appendChild(player);
+    this.playerEl = player;
+
+    // Pet Mito
+    const pet = document.createElement('div');
+    pet.className = 'pet-mito';
+    pet.innerHTML = `<img src="assets/pet_mito.webp" alt="Mito" style="width: 100%; height: 100%;">`;
+    arena.appendChild(pet);
+    this.petEl = pet;
+
+    // Joystick
+    const joystick = document.createElement('div');
+    joystick.id = 'joystick';
+    joystick.innerHTML = '<div class="j-base"><div class="j-stick"></div></div>';
+    arena.appendChild(joystick);
+    this.joystickEl = joystick;
+
+    this.arenaEl = arena;
+    this.root.appendChild(arena);
+
+    this.setupControls();
+    this.loadQuestionPool();
+    this.showIntroCutIn();
+  }
+
+  showIntroCutIn() {
+    const cutIn = document.createElement('div');
+    cutIn.className = 'intro-cutin';
+    cutIn.innerHTML = `
+      <img src="${this.config.bossImg}" alt="${this.config.name}">
+      <h2>${this.config.name}</h2>
+      <p>${this.config.introCutIn}</p>
+    `;
+    this.arenaEl.appendChild(cutIn);
+
+    setTimeout(() => {
+      cutIn.style.opacity = '0';
+      setTimeout(() => {
+        cutIn.remove();
+        this.startBattle();
+      }, 500);
+    }, 3000);
+  }
+
+  startBattle() {
+    this.running = true;
+    this.loadQuestion();
+    this.lastTime = performance.now();
+    this.attackTimer = this.config.baseDifficulty.firstAttackDelay;
     
-    // Input
-    keys: {},
-    joystick: { active: false, startX: 0, startY: 0, deltaX: 0, deltaY: 0 }
-  };
+    // Item boost (ช้าลง 40% ใน 10 วิแรก)
+    if (this.gameState.item === 'boost' && !this.gameState.itemUsed) {
+      this.gameState.itemUsed = true;
+      const originalInterval = this.config.baseDifficulty.attackInterval;
+      this.config.baseDifficulty.attackInterval *= 1.4;
+      setTimeout(() => {
+        this.config.baseDifficulty.attackInterval = originalInterval;
+      }, 10000);
+    }
 
-  let rafId = null;
-  let attackTimer = null;
-  let campingAttackTimer = null; // timer ยิงไฟลูกใส่ camper
-  let timerInterval = null;
-  let lastFrameTime = 0;
-  let firstAttack = true;
-
-  // ===== DOM ELEMENTS =====
-  let container = null;
-  let bossSprite = null;
-  let playerSprite = null;
-  let answerPads = [];
-  let hudElements = {};
-
-  // ===== HELPER FUNCTIONS =====
-  function vwToPx(vw) {
-    return (vw / 100) * window.innerWidth;
+    this.gameLoop();
   }
 
-  function vhToPx(vh) {
-    return (vh / 100) * window.innerHeight;
-  }
-
-  function pxToVw(px) {
-    return (px / window.innerWidth) * 100;
-  }
-
-  function pxToVh(px) {
-    return (px / window.innerHeight) * 100;
-  }
-
-  function distance(x1, y1, x2, y2) {
-    // x/y เป็น % ของ viewport → แปลงเป็น vw ก่อน (ระยะทางยุคลิดในหน่วย vw)
-    const dxPx = (x2 - x1) / 100 * window.innerWidth;
-    const dyPx = (y2 - y1) / 100 * window.innerHeight;
-    const distPx = Math.sqrt(dxPx * dxPx + dyPx * dyPx);
-    return (distPx / window.innerWidth) * 100; // หน่วย vw
-  }
-
-  function collide(x1, y1, r1, x2, y2, r2) {
-    const dist = distance(x1, y1, x2, y2);
-    return dist < (r1 + r2);
-  }
-
-  // Random question selector
-  function getRandomQuestions(count) {
-    const allQuestions = [];
-    const planets = ['numberon', 'bionia', 'aksara', 'lingua', 'civilis'];
-    
-    planets.forEach(planetId => {
-      if (QV.QUESTIONS[planetId]) {
-        Object.values(QV.QUESTIONS[planetId]).forEach(zone => {
-          zone.forEach(q => {
-            allQuestions.push(q);
-          });
-        });
+  setupControls() {
+    // Keyboard
+    this.keydownHandler = (e) => {
+      const key = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        this.gameState.keys[key] = true;
+        e.preventDefault();
       }
+    };
+    this.keyupHandler = (e) => {
+      const key = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd'].includes(key)) {
+        this.gameState.keys[key] = false;
+      }
+    };
+    window.addEventListener('keydown', this.keydownHandler);
+    window.addEventListener('keyup', this.keyupHandler);
+
+    // Joystick
+    const stick = this.joystickEl.querySelector('.j-stick');
+    const base = this.joystickEl.querySelector('.j-base');
+    
+    const handleStart = (clientX, clientY) => {
+      this.gameState.joystick.active = true;
+    };
+    
+    const handleMove = (clientX, clientY) => {
+      if (!this.gameState.joystick.active) return;
+      const rect = base.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      let dx = clientX - centerX;
+      let dy = clientY - centerY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const maxDist = rect.width / 2;
+      if (distance > maxDist) {
+        dx = (dx / distance) * maxDist;
+        dy = (dy / distance) * maxDist;
+      }
+      stick.style.transform = `translate(${dx}px, ${dy}px)`;
+      this.gameState.joystick.dx = dx / maxDist;
+      this.gameState.joystick.dy = dy / maxDist;
+    };
+    
+    const handleEnd = () => {
+      this.gameState.joystick.active = false;
+      stick.style.transform = 'translate(0, 0)';
+      this.gameState.joystick.dx = 0;
+      this.gameState.joystick.dy = 0;
+    };
+
+    base.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    });
+    base.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    });
+    base.addEventListener('touchend', handleEnd);
+    base.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', handleEnd);
+  }
+
+  loadQuestionPool() {
+    const subject = this.config.subject;
+    // แมปวิชาของบอส → คีย์ข้อความจริงใน QV.QUESTIONS (โครงสร้างเดิม: ดาว 5 ดวง x โซน)
+    const map = { math: 'numberon', science: 'bionia', thai: 'aksara', english: 'lingua', social: 'civilis' };
+    const planetKey = map[subject] || subject;
+    const planet = QV.QUESTIONS[planetKey] || {};
+    // รวมข้อความทั้งหมดจากทุกโซนของดาวดวงนั้น
+    const questions = [];
+    Object.values(planet).forEach(zoneQs => {
+      if (Array.isArray(zoneQs)) questions.push(...zoneQs);
+    });
+    this.questionPool = questions.filter(q => !this.usedQuestions.has(q.q));
+  }
+
+  loadQuestion() {
+    if (this.questionPool.length === 0) {
+      this.usedQuestions.clear();
+      this.loadQuestionPool();
+    }
+
+    const q = this.questionPool.splice(Math.floor(Math.random() * this.questionPool.length), 1)[0];
+    this.usedQuestions.add(q.q);
+    this.gameState.currentQuestion = q;
+
+    // Select 4 pad slots
+    const slots = this.selectPadSlots();
+    this.gameState.pads = q.choices.map((choice, i) => {
+      const slot = slots[i];
+      return {
+        x: slot.left,
+        y: slot.top,
+        text: choice,
+        correct: i === q.answerIdx
+      };
     });
 
-    // Shuffle and pick (Fisher-Yates)
-    const shuffled = shuffleArray(allQuestions);
-    return shuffled.slice(0, count);
-  }
+    this.renderPads();
+    this.gameState.questionCount++;
 
-  function shuffleArray(arr) {
-    const result = [...arr];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
+    // Event card ทุก 3 ข้อ
+    if (this.gameState.questionCount > 0 && this.gameState.questionCount % 3 === 0) {
+      this.triggerEvent();
     }
-    return result;
   }
 
-  // เลือก 4 ตำแหน่งป้ายจาก 8 slots โดยให้ห่างกันพอ (กันป้ายซ้อน)
-  function selectPadSlots() {
-    const shuffled = shuffleArray([...CONFIG.PAD_SLOTS]);
+  selectPadSlots() {
+    const available = [...CONFIG.PAD_SLOTS];
     const selected = [];
     
-    for (let i = 0; i < shuffled.length && selected.length < 4; i++) {
-      const candidate = shuffled[i];
-      
-      // ตรวจสอบว่าไม่ใกล้ตำแหน่งที่เลือกไว้แล้วเกินไป
-      let tooClose = false;
-      for (let j = 0; j < selected.length; j++) {
-        const dist = distance(candidate.x, candidate.y, selected[j].x, selected[j].y);
-        if (dist < CONFIG.PAD_MIN_DISTANCE) {
-          tooClose = true;
+    for (let i = 0; i < 4; i++) {
+      let attempts = 0;
+      while (attempts < 50) {
+        const idx = Math.floor(Math.random() * available.length);
+        const slot = available[idx];
+        
+        let valid = true;
+        for (const other of selected) {
+          const dx = slot.left - other.left;
+          const dy = slot.top - other.top;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < CONFIG.PAD_MIN_DISTANCE) {
+            valid = false;
+            break;
+          }
+        }
+        
+        if (valid) {
+          selected.push(slot);
+          available.splice(idx, 1);
           break;
         }
+        attempts++;
       }
       
-      if (!tooClose) {
-        selected.push(candidate);
-      }
-    }
-    
-    // ถ้าหาไม่ครบ 4 (แทบไม่เกิด) ก็เอาที่เหลือมาเติม
-    while (selected.length < 4 && shuffled.length > selected.length) {
-      const candidate = shuffled[selected.length];
-      if (!selected.find(s => s.x === candidate.x && s.y === candidate.y)) {
-        selected.push(candidate);
+      if (selected.length === i) {
+        selected.push(available.splice(0, 1)[0]);
       }
     }
     
     return selected;
   }
 
-  // ===== DOM CREATION =====
-  function createDOM(bossId) {
-    const boss = BOSS_DATA[bossId];
+  renderPads() {
+    this.arenaEl.querySelectorAll('.answer-pad').forEach(el => el.remove());
     
-    container = document.createElement('div');
-    container.id = 'screen-boss';
-    container.className = 'screen-boss';
-    container.innerHTML = `
-      <div class="boss-arena">
-        <!-- Boss -->
-        <div class="boss-sprite" id="boss-sprite">
-          <img src="${boss.image}" alt="${boss.name}">
-        </div>
-        
-        <!-- Player -->
-        <div class="player-sprite" id="player-sprite">
-          <img src="assets/suit_${QV.state.player.suit}.webp" alt="Player">
-        </div>
-        
-        <!-- Answer Pads -->
-        <div id="answer-pads"></div>
-        
-        <!-- Attack Tiles Container -->
-        <div id="attack-tiles"></div>
-        
-        <!-- HUD -->
-        <div class="hud-boss">
-          <div class="hud-top-left">
-            <div id="player-hearts"></div>
-            <div id="player-xp-bar"></div>
-          </div>
-          
-          <div class="hud-top-center">
-            <div id="question-counter"></div>
-            <div id="question-text"></div>
-            <div id="timer-bar"></div>
-          </div>
-          
-          <div class="hud-top-right">
-            <div class="boss-hp-label">${boss.name}</div>
-            <div id="boss-hp-bar"></div>
-          </div>
-        </div>
-        
-        <!-- Joystick (mobile) -->
-        <div id="joystick-container" class="joystick-container">
-          <div class="joystick-outer">
-            <div class="joystick-inner" id="joystick-inner"></div>
-          </div>
-        </div>
-        
-        <!-- Camping warning -->
-        <div id="camping-warning" class="camping-warning" style="display:none;">⚠️ ยืนนิ่งนานไป! บอสกำลังเล็ง!</div>
-        
-        <!-- Hint overlay -->
-        <div id="hint-overlay" class="hint-overlay"></div>
-        
-        <!-- End screen -->
-        <div id="end-screen" class="end-screen"></div>
-      </div>
-    `;
-
-    // Position boss
-    bossSprite = container.querySelector('#boss-sprite');
-    bossSprite.style.left = boss.x + '%';
-    bossSprite.style.top = boss.y + '%';
-
-    // Position player
-    playerSprite = container.querySelector('#player-sprite');
-    updatePlayerPosition();
-
-    // Create answer pads (สร้างรอไว้ 4 อัน ตำแหน่งจริงจะสุ่มใน loadQuestion)
-    const padsContainer = container.querySelector('#answer-pads');
-    for (let i = 0; i < 4; i++) {
-      const pad = document.createElement('div');
-      pad.className = 'answer-pad';
-      pad.style.left = '50%';
-      pad.style.top = '50%';
-      pad.style.opacity = '0'; // ซ่อนไว้ก่อน loadQuestion
-      pad.innerHTML = '<div class="pad-content"></div>';
-      padsContainer.appendChild(pad);
-      answerPads.push(pad);
-    }
-
-    // HUD elements
-    hudElements = {
-      hearts: container.querySelector('#player-hearts'),
-      xpBar: container.querySelector('#player-xp-bar'),
-      questionCounter: container.querySelector('#question-counter'),
-      questionText: container.querySelector('#question-text'),
-      timerBar: container.querySelector('#timer-bar'),
-      bossHpBar: container.querySelector('#boss-hp-bar'),
-      hintOverlay: container.querySelector('#hint-overlay'),
-      endScreen: container.querySelector('#end-screen'),
-      attackTiles: container.querySelector('#attack-tiles'),
-      campingWarning: container.querySelector('#camping-warning')
-    };
-
-    return container;
+    this.gameState.pads.forEach((pad, i) => {
+      const el = document.createElement('div');
+      el.className = 'answer-pad';
+      el.dataset.index = i;
+      el.style.cssText = `
+        position: absolute;
+        left: ${pad.x}%;
+        top: ${pad.y}%;
+        transform: translate(-50%, -50%);
+        width: 12vw;
+        height: 12vw;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+        color: white;
+        text-align: center;
+        padding: 1vw;
+        transition: all 0.3s;
+        cursor: pointer;
+      `;
+      
+      const core = document.createElement('div');
+      core.className = 'pad-core';
+      core.textContent = pad.text;
+      core.style.cssText = `
+        width: 70%;
+        height: 70%;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      `;
+      el.appendChild(core);
+      
+      this.arenaEl.appendChild(el);
+    });
   }
 
-  function updatePlayerPosition() {
-    if (!playerSprite) return;
-    playerSprite.style.left = gameState.player.x + '%';
-    playerSprite.style.top = gameState.player.y + '%';
-    
-    if (gameState.player.facingLeft) {
-      playerSprite.style.transform = 'scaleX(-1)';
+  updatePlayer(dt) {
+    if (this.gameState.player.frozen) return;
+
+    let dx = 0, dy = 0;
+
+    // Keyboard
+    if (this.gameState.keys.w) dy -= 1;
+    if (this.gameState.keys.s) dy += 1;
+    if (this.gameState.keys.a) dx -= 1;
+    if (this.gameState.keys.d) dx += 1;
+
+    // Joystick
+    if (this.gameState.joystick.active) {
+      dx += this.gameState.joystick.dx;
+      dy += this.gameState.joystick.dy;
+    }
+
+    // Normalize
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > 0) {
+      dx /= len;
+      dy /= len;
+    }
+
+    // Combo dash
+    let speed = CONFIG.PLAYER_SPEED;
+    if (this.gameState.combo >= CONFIG.COMBO_DASH_THRESHOLD) {
+      speed *= 1.3;
+      this.playerEl.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.8)';
     } else {
-      playerSprite.style.transform = 'scaleX(1)';
-    }
-  }
-
-  // ===== MOVEMENT =====
-  function handleKeyDown(e) {
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'].includes(e.key)) {
-      e.preventDefault();
-    }
-    gameState.keys[e.key.toLowerCase()] = true;
-  }
-
-  function handleKeyUp(e) {
-    gameState.keys[e.key.toLowerCase()] = false;
-  }
-
-  function setupJoystick() {
-    const joystickContainer = container.querySelector('#joystick-container');
-    const joystickInner = container.querySelector('#joystick-inner');
-    
-    if (!joystickContainer) return;
-
-    // Show joystick on touch devices
-    if ('ontouchstart' in window) {
-      joystickContainer.style.display = 'block';
+      this.playerEl.style.boxShadow = 'none';
     }
 
-    joystickContainer.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const rect = joystickContainer.getBoundingClientRect();
-      gameState.joystick.active = true;
-      gameState.joystick.startX = touch.clientX - rect.left;
-      gameState.joystick.startY = touch.clientY - rect.top;
-    });
+    this.gameState.player.vx = dx * speed;
+    this.gameState.player.vy = dy * speed;
 
-    joystickContainer.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      if (!gameState.joystick.active) return;
-      
-      const touch = e.touches[0];
-      const rect = joystickContainer.getBoundingClientRect();
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      
-      let deltaX = touch.clientX - rect.left - centerX;
-      let deltaY = touch.clientY - rect.top - centerY;
-      
-      const maxDist = 35; // pixels from center
-      const dist = Math.sqrt(deltaX ** 2 + deltaY ** 2);
-      if (dist > maxDist) {
-        deltaX = (deltaX / dist) * maxDist;
-        deltaY = (deltaY / dist) * maxDist;
-      }
-      
-      gameState.joystick.deltaX = deltaX / maxDist; // normalize -1 to 1
-      gameState.joystick.deltaY = deltaY / maxDist;
-      
-      // Move inner joystick
-      joystickInner.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-    });
+    this.gameState.player.x += this.gameState.player.vx;
+    this.gameState.player.y += this.gameState.player.vy;
 
-    joystickContainer.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      gameState.joystick.active = false;
-      gameState.joystick.deltaX = 0;
-      gameState.joystick.deltaY = 0;
-      joystickInner.style.transform = 'translate(0, 0)';
-    });
-  }
+    // Bounds
+    this.gameState.player.x = Math.max(5, Math.min(95, this.gameState.player.x));
+    this.gameState.player.y = Math.max(5, Math.min(95, this.gameState.player.y));
 
-  function updatePlayerMovement(deltaTime) {
-    if (gameState.player.frozen || gameState.phase !== 'question') return;
+    this.playerEl.style.left = `${this.gameState.player.x}%`;
+    this.playerEl.style.top = `${this.gameState.player.y}%`;
 
-    let vx = 0;
-    let vy = 0;
-
-    // Keyboard input
-    if (gameState.keys['arrowleft'] || gameState.keys['a']) vx -= 1;
-    if (gameState.keys['arrowright'] || gameState.keys['d']) vx += 1;
-    if (gameState.keys['arrowup'] || gameState.keys['w']) vy -= 1;
-    if (gameState.keys['arrowdown'] || gameState.keys['s']) vy += 1;
-
-    // Joystick input
-    if (gameState.joystick.active) {
-      vx = gameState.joystick.deltaX;
-      vy = gameState.joystick.deltaY;
-    }
-
-    // Normalize diagonal movement
-    if (vx !== 0 && vy !== 0) {
-      const mag = Math.sqrt(vx ** 2 + vy ** 2);
-      vx /= mag;
-      vy /= mag;
-    }
-
-    // Update velocity
-    gameState.player.vx = vx;
-    gameState.player.vy = vy;
-
-    // Apply movement
-    if (vx !== 0 || vy !== 0) {
-      const speed = CONFIG.PLAYER_SPEED * deltaTime; // % of arena per second × dt
-      gameState.player.x += vx * speed;
-      gameState.player.y += vy * speed;
-
-      // Clamp to bounds
-      gameState.player.x = Math.max(CONFIG.ARENA_BOUNDS.minX, Math.min(CONFIG.ARENA_BOUNDS.maxX, gameState.player.x));
-      gameState.player.y = Math.max(CONFIG.ARENA_BOUNDS.minY, Math.min(CONFIG.ARENA_BOUNDS.maxY, gameState.player.y));
-
-      // Update facing direction
-      if (vx < 0) gameState.player.facingLeft = true;
-      if (vx > 0) gameState.player.facingLeft = false;
-
-      // Add walking animation class
-      if (!playerSprite.classList.contains('walking')) {
-        playerSprite.classList.add('walking');
-      }
+    // Shield visual
+    if (this.gameState.player.shielded) {
+      this.playerEl.style.border = '3px solid cyan';
     } else {
-      playerSprite.classList.remove('walking');
-    }
-
-    updatePlayerPosition();
-  }
-
-  // ===== ATTACKS =====
-  function scheduleNextAttack() {
-    if (attackTimer) clearTimeout(attackTimer);
-    
-    const delay = CONFIG.ATTACK_INTERVAL_MIN + Math.random() * (CONFIG.ATTACK_INTERVAL_MAX - CONFIG.ATTACK_INTERVAL_MIN) + (firstAttack ? CONFIG.FIRST_ATTACK_DELAY : 0);
-    firstAttack = false;
-    
-    attackTimer = setTimeout(() => {
-      if (gameState.phase === 'question') {
-        launchAttack();
-        scheduleNextAttack();
-      }
-    }, delay);
-  }
-
-  function launchAttack() {
-    const type = ATTACK_TYPES[Math.floor(Math.random() * ATTACK_TYPES.length)];
-    
-    if (type === 'fireball') {
-      createFireball();
-    } else if (type === 'ice') {
-      createIce();
-    } else if (type === 'portal') {
-      createPortal();
+      this.playerEl.style.border = 'none';
     }
   }
 
-  function createFireball() {
-    const targetX = gameState.player.x;
-    const targetY = gameState.player.y;
-    
-    const attack = {
-      type: 'fireball',
-      x: BOSS_DATA[gameState.boss].x,
-      y: BOSS_DATA[gameState.boss].y,
-      targetX,
-      targetY,
-      startTime: performance.now(),
-      duration: 3400, // 700ms warn + 2700ms travel (ช้าลงมาก ให้เวลาเดินหลบ)
-      warned: false,
-      hit: false
-    };
-    
-    gameState.attacks.push(attack);
-    
-    // Create DOM
-    const tile = document.createElement('div');
-    tile.className = 'atk-tile fireball';
-    tile.style.left = attack.x + '%';
-    tile.style.top = attack.y + '%';
-    tile.innerHTML = '<img src="assets/boss_fireball.webp" alt="Fireball">';
-    hudElements.attackTiles.appendChild(tile);
-    attack.element = tile;
-    
-    // Warning line
-    const line = document.createElement('div');
-    line.className = 'warn-ring';
-    line.style.left = attack.x + '%';
-    line.style.top = attack.y + '%';
-    const angle = Math.atan2(targetY - attack.y, targetX - attack.x) * 180 / Math.PI;
-    line.style.transform = `rotate(${angle}deg)`;
-    hudElements.attackTiles.appendChild(line);
-    attack.warnElement = line;
-    
-    setTimeout(() => {
-      if (line.parentNode) line.remove();
-    }, 700);
+  updatePet(dt) {
+    // Bob animation
+    this.gameState.pet.bobOffset += dt * 0.003;
+    const bob = Math.sin(this.gameState.pet.bobOffset) * 2;
+
+    // Follow player
+    const tx = this.gameState.player.x;
+    const ty = this.gameState.player.y - 8;
+    this.gameState.pet.x += (tx - this.gameState.pet.x) * 0.05;
+    this.gameState.pet.y += (ty - this.gameState.pet.y) * 0.05;
+
+    this.petEl.style.left = `${this.gameState.pet.x}%`;
+    this.petEl.style.top = `${this.gameState.pet.y + bob}%`;
   }
 
-  function createIce() {
-    const attack = {
-      type: 'ice',
-      drops: [],
-      startTime: performance.now(),
-      duration: 2000, // 800ms warn + 1200ms fall
-      warned: false,
-      hit: false
-    };
-    
-    // Create 3 ice drops
-    for (let i = 0; i < 3; i++) {
-      // สุ่มรอบผู้เล่น (ไม่ซ้ำตำแหน่งเดิม)
-      const x = Math.max(5, Math.min(95, gameState.player.x + (Math.random() - 0.5) * 50));
-      const y = -10; // start above screen
-      const targetY = Math.max(20, Math.min(92, gameState.player.y + (Math.random() - 0.5) * 30)); // ตกใกล้ที่ผู้เล่นยืน
-      
-      const drop = { x, y, targetY };
-      attack.drops.push(drop);
-      
-      // Create DOM
-      const tile = document.createElement('div');
-      tile.className = 'atk-tile ice';
-      tile.style.left = x + '%';
-      tile.style.top = y + '%';
-      tile.innerHTML = '<img src="assets/boss_ice.webp" alt="Ice">';
-      hudElements.attackTiles.appendChild(tile);
-      drop.element = tile;
-      
-      // Warning shadow
-      const shadow = document.createElement('div');
-      shadow.className = 'warn-ring circle';
-      shadow.style.left = x + '%';
-      shadow.style.top = targetY + '%';
-      hudElements.attackTiles.appendChild(shadow);
-      drop.shadowElement = shadow;
-      
-      setTimeout(() => {
-        if (shadow.parentNode) shadow.remove();
-      }, 800);
-    }
-    
-    gameState.attacks.push(attack);
-  }
+  checkPadCollision() {
+    const pads = this.arenaEl.querySelectorAll('.answer-pad');
+    const px = this.gameState.player.x;
+    const py = this.gameState.player.y;
+    const speed = Math.sqrt(this.gameState.player.vx ** 2 + this.gameState.player.vy ** 2);
 
-  function createPortal() {
-    // Spawn ออฟเซตห่างจากผู้เล่น ไม่งั้นโดนทันทีตั้งแต่เกิด
-    const offsetX = (gameState.player.x < 50 ? 1 : -1) * (20 + Math.random() * 10);
-    const offsetY = (gameState.player.y < 50 ? 1 : -1) * (15 + Math.random() * 10);
-    const attack = {
-      type: 'portal',
-      x: Math.max(8, Math.min(92, gameState.player.x + offsetX)),
-      y: Math.max(8, Math.min(92, gameState.player.y + offsetY)),
-      startTime: performance.now(),
-      duration: 3500,
-      warned: false,
-      hit: false,
-      radius: 5 // vw
-    };
-    
-    gameState.attacks.push(attack);
-    
-    // Create DOM
-    const tile = document.createElement('div');
-    tile.className = 'atk-tile portal';
-    tile.style.left = attack.x + '%';
-    tile.style.top = attack.y + '%';
-    tile.innerHTML = '<img src="assets/boss_portal.webp" alt="Portal"><div class="portal-ring"></div>';
-    hudElements.attackTiles.appendChild(tile);
-    attack.element = tile;
-  }
+    pads.forEach((padEl, i) => {
+      const pad = this.gameState.pads[i];
+      const dx = px - pad.x;
+      const dy = py - pad.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
 
-  function updateAttacks(now) {
-    for (let idx = gameState.attacks.length - 1; idx >= 0; idx--) {
-      const attack = gameState.attacks[idx];
-      const elapsed = now - attack.startTime;
-      
-      if (attack.type === 'fireball') {
-        const warnDuration = attack.isCampingPunishment ? 500 : 700;
-        
-        if (elapsed < warnDuration) {
-          // Warning phase
-        } else if (elapsed < attack.duration) {
-          // Travel phase
-          const travelProgress = Math.min(1, (elapsed - warnDuration) / (attack.duration - warnDuration));
-          const x = attack.x + (attack.targetX - attack.x) * travelProgress;
-          const y = attack.y + (attack.targetY - attack.y) * travelProgress;
-          
-          if (attack.element) {
-            attack.element.style.left = x + '%';
-            attack.element.style.top = y + '%';
-          }
-          
-          // Check collision
-          if (!attack.hit && collide(x, y, CONFIG.ATTACK_RADIUS, gameState.player.x, gameState.player.y, CONFIG.PLAYER_RADIUS)) {
-            hitPlayer(attack);
-            attack.hit = true;
+      if (dist < 6) {
+        padEl.style.transform = 'translate(-50%, -50%) scale(1.1)';
+        padEl.style.borderColor = 'rgba(255, 255, 255, 0.8)';
+
+        // Intentional answer check
+        if (speed < CONFIG.INTENTIONAL_THRESHOLD) {
+          if (this.intentionalState.padIndex === i) {
+            this.intentionalState.timer += 16;
+            if (this.intentionalState.timer >= CONFIG.INTENTIONAL_DURATION) {
+              this.onAnswer(pad.correct, pad);
+              this.intentionalState = { padIndex: -1, timer: 0 };
+            }
+          } else {
+            this.intentionalState = { padIndex: i, timer: 0 };
           }
         } else {
-          // Remove
-          if (attack.element && attack.element.parentNode) attack.element.remove();
-          if (attack.warnElement && attack.warnElement.parentNode) attack.warnElement.remove();
-          
-          // Dodged
-          if (!attack.hit) {
-            onDodge();
-          }
-          
-          gameState.attacks.splice(idx, 1);
+          this.intentionalState = { padIndex: -1, timer: 0 };
         }
-      }
-      
-      else if (attack.type === 'ice') {
-        if (elapsed < 800) {
-          // Warning phase
-        } else if (elapsed < attack.duration) {
-          // Fall phase
-          const fallProgress = (elapsed - 800) / 1200;
-          
-          attack.drops.forEach(drop => {
-            const y = drop.y + (drop.targetY - drop.y) * fallProgress;
-            
-            if (drop.element) {
-              drop.element.style.top = y + '%';
-            }
-            
-            // Check collision ตอนถึงพื้นจริง (95%+) เท่านั้น
-            if (!attack.hit && fallProgress > 0.93 && collide(drop.x, y, CONFIG.ATTACK_RADIUS, gameState.player.x, gameState.player.y, CONFIG.PLAYER_RADIUS)) {
-              hitPlayer(attack);
-              freezePlayer();
-              attack.hit = true;
-            }
-          });
-        } else {
-          // Remove
-          attack.drops.forEach(drop => {
-            if (drop.element && drop.element.parentNode) drop.element.remove();
-            if (drop.shadowElement && drop.shadowElement.parentNode) drop.shadowElement.remove();
-          });
-          
-          if (!attack.hit) {
-            onDodge();
-          }
-          
-          gameState.attacks.splice(idx, 1);
-        }
-      }
-      
-      else if (attack.type === 'portal') {
-        if (elapsed < 500) {
-          // Warning phase - scale up
-          const scale = elapsed / 500;
-          if (attack.element) {
-            attack.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
-          }
-        } else if (elapsed < attack.duration) {
-          // Active phase
-          const dist = distance(attack.x, attack.y, gameState.player.x, gameState.player.y);
-          
-          if (!attack.hit && dist < attack.radius) {
-            // Player ยังยืนอยู่ในพอร์ทอลตอนกระตุ้น
-            if (elapsed > 3000) {
-              hitPlayer(attack);
-              attack.hit = true;
-            }
-          }
-        } else {
-          // Remove
-          if (attack.element && attack.element.parentNode) attack.element.remove();
-          
-          if (!attack.hit) {
-            onDodge();
-          }
-          
-          gameState.attacks.splice(idx, 1);
-        }
-      }
-    }
-  }
-
-  function hitPlayer(attack) {
-    if (QV.state.energy <= 0) return;
-    
-    QV.state.energy -= CONFIG.ATTACK_DAMAGE;
-    QV.saveState(QV.state);
-    updateHUD();
-    
-    // Visual feedback
-    playerSprite.classList.add('hit');
-    setTimeout(() => playerSprite.classList.remove('hit'), 300);
-    
-    // Knockback
-    const dx = gameState.player.x - (attack.x || gameState.player.x);
-    const dy = gameState.player.y - (attack.y || gameState.player.y);
-    const mag = Math.sqrt(dx ** 2 + dy ** 2) || 1;
-    gameState.player.x += (dx / mag) * 5;
-    gameState.player.y += (dy / mag) * 5;
-    
-    // Clamp
-    gameState.player.x = Math.max(CONFIG.ARENA_BOUNDS.minX, Math.min(CONFIG.ARENA_BOUNDS.maxX, gameState.player.x));
-    gameState.player.y = Math.max(CONFIG.ARENA_BOUNDS.minY, Math.min(CONFIG.ARENA_BOUNDS.maxY, gameState.player.y));
-    
-    updatePlayerPosition();
-    
-    gameState.combo = 0;
-    
-    // Check lose
-    if (QV.state.energy <= 0) {
-      endGame(false);
-    }
-  }
-
-  function freezePlayer() {
-    gameState.player.frozen = true;
-    playerSprite.classList.add('frozen');
-    
-    setTimeout(() => {
-      gameState.player.frozen = false;
-      playerSprite.classList.remove('frozen');
-    }, 1500);
-  }
-
-  function onDodge() {
-    gameState.combo++;
-    QV.state.xp += CONFIG.DODGE_XP;
-    QV.saveState(QV.state);
-    QV.app.toast(`Dodged! +${CONFIG.DODGE_XP} XP`);
-    updateHUD();
-  }
-
-  // ===== CAMPING DETECTION (กันคนยืนแช่) =====
-  function updateCampingDetection(now) {
-    if (gameState.phase !== 'question' || gameState.player.frozen) return;
-    
-    const camping = gameState.campingDetection;
-    
-    // คำนวณความเร็ว (magnitude ของ velocity vector ที่ normalized แล้ว)
-    const speed = Math.sqrt((gameState.player.vx || 0) ** 2 + (gameState.player.vy || 0) ** 2);
-    const isMoving = speed > CONFIG.MOVING_THRESHOLD;
-    
-    // ตรวจว่าอยู่บนป้ายใดป้ายหนึ่งหรือไม่ (อยู่บนป้าย = ไม่ใช่ camping)
-    let onAnyPad = false;
-    for (let i = 0; i < gameState.padPositions.length; i++) {
-      const padPos = gameState.padPositions[i];
-      if (!padPos) continue;
-      const dist = distance(gameState.player.x, gameState.player.y, padPos.x, padPos.y);
-      if (dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_RADIUS)) {
-        onAnyPad = true;
-        break;
-      }
-    }
-    
-    // ถ้ายืนนิ่ง (และไม่อยู่บนป้าย) → เริ่มนับเวลา
-    if (!isMoving && !onAnyPad) {
-      if (!camping.stillStartTime) {
-        camping.stillStartTime = now;
-        camping.lastPos = { x: gameState.player.x, y: gameState.player.y };
       } else {
-        const stillDuration = now - camping.stillStartTime;
-        
-        // ตรวจว่ายังอยู่ตำแหน่งเดิมหรือไม่ (drift เล็กน้อยยอมได้)
-        const movedDist = distance(camping.lastPos.x, camping.lastPos.y, gameState.player.x, gameState.player.y);
-        if (movedDist > 3) {
-          // ขยับออกจากตำแหน่งเดิม → รีเซ็ต
-          resetCampingDetection();
+        padEl.style.transform = 'translate(-50%, -50%) scale(1)';
+        padEl.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+        if (this.intentionalState.padIndex === i) {
+          this.intentionalState = { padIndex: -1, timer: 0 };
+        }
+      }
+    });
+  }
+
+  onAnswer(correct, pad) {
+    if (correct) {
+      const xp = this.gameState.currentQuestion.xp || 10;
+      QV.state.player.xp += xp;
+      this.gameState.score += xp;
+      this.gameState.combo++;
+      this.gameState.correctStreak++;
+      this.gameState.correctCount = (this.gameState.correctCount || 0) + 1;
+      // ชนะบอส: ตอบถูกครบ WIN_AT ข้อ
+      if (this.gameState.correctCount >= CONFIG.WIN_AT) {
+        this.showVictory();
+        return;
+      }
+      if (this.gameState.combo > this.gameState.maxCombo) this.gameState.maxCombo = this.gameState.combo;
+
+      // Time Attack: โบนัสเวลา +5 วิ
+      if (this.gameState.timeLimit > 0) {
+        this.gameState.timeRemaining = Math.min(this.gameState.timeLimit, this.gameState.timeRemaining + 5);
+        const taTimer = this.arenaEl.querySelector('.ta-timer');
+        if (taTimer) taTimer.textContent = Math.ceil(this.gameState.timeRemaining) + 's';
+        // ตอบครบ 10 ข้อ = ชนะ Time Attack
+                if (this.gameState.questionCount >= 10) {
+          this.timeAttackBonus();
           return;
         }
-        
-        // เตือนเมื่อยืนนิ่งนานผ่านเกณฑ์
-        if (stillDuration >= CONFIG.CAMPING_TIME && !camping.warned) {
-          camping.warned = true;
-          showCampingWarning(true);
-          
-          // นัดยิงไฟลูกใส่ camper หลังเตือน
-          if (!camping.attackScheduled) {
-            camping.attackScheduled = true;
-            campingAttackTimer = setTimeout(() => {
-              if (gameState.phase === 'question') {
-                createTargetedFireball(gameState.player.x, gameState.player.y);
-              }
-              camping.attackScheduled = false;
-            }, CONFIG.CAMPING_ATTACK_DELAY);
-          }
-        }
       }
-    } else {
-      // เคลื่อนที่ หรือ ยืนบนป้าย → รีเซ็ต
-      if (camping.stillStartTime || camping.warned) {
-        resetCampingDetection();
+      // Combo counter
+      const comboEl = this.arenaEl.querySelector('.combo-counter');
+      comboEl.style.display = 'block';
+      comboEl.querySelector('span').textContent = this.gameState.combo;
+
+      // Potion: +HP ทุก 3 ข้อถูก
+      if (this.gameState.item === 'potion' && this.gameState.correctStreak % 3 === 0) {
+        this.gameState.player.hp = Math.min(3, this.gameState.player.hp + 1);
+        this.updateHPDisplay();
       }
-    }
-  }
 
-  function resetCampingDetection() {
-    const camping = gameState.campingDetection;
-    camping.stillStartTime = null;
-    camping.warned = false;
-    camping.attackScheduled = false;
-    showCampingWarning(false);
-    
-    if (campingAttackTimer) {
-      clearTimeout(campingAttackTimer);
-      campingAttackTimer = null;
-    }
-  }
-
-  function showCampingWarning(show) {
-    if (!hudElements.campingWarning) return;
-    
-    if (show) {
-      hudElements.campingWarning.style.display = 'block';
-      hudElements.campingWarning.classList.add('pulse');
-    } else {
-      hudElements.campingWarning.style.display = 'none';
-      hudElements.campingWarning.classList.remove('pulse');
-    }
-  }
-
-  // ยิงไฟลูกเล็งใส่ตำแหน่งที่ camper ยืน (เร็วกว่าปกติ)
-  function createTargetedFireball(targetX, targetY) {
-    const attack = {
-      type: 'fireball',
-      x: BOSS_DATA[gameState.boss].x,
-      y: BOSS_DATA[gameState.boss].y,
-      targetX,
-      targetY,
-      startTime: performance.now(),
-      duration: 2000, // เร็วกว่าปกติ (500ms warn + 1500ms travel)
-      warned: false,
-      hit: false,
-      isCampingPunishment: true
-    };
-    
-    gameState.attacks.push(attack);
-    
-    const tile = document.createElement('div');
-    tile.className = 'atk-tile fireball camping-attack';
-    tile.style.left = attack.x + '%';
-    tile.style.top = attack.y + '%';
-    tile.innerHTML = '<img src="assets/boss_fireball.webp" alt="Fireball">';
-    hudElements.attackTiles.appendChild(tile);
-    attack.element = tile;
-    
-    const line = document.createElement('div');
-    line.className = 'warn-ring';
-    line.style.left = attack.x + '%';
-    line.style.top = attack.y + '%';
-    const angle = Math.atan2(targetY - attack.y, targetX - attack.x) * 180 / Math.PI;
-    line.style.transform = `rotate(${angle}deg)`;
-    hudElements.attackTiles.appendChild(line);
-    attack.warnElement = line;
-    
-    setTimeout(() => {
-      if (line.parentNode) line.remove();
-    }, 500);
-  }
-
-  // ===== QUESTIONS =====
-  function loadQuestion() {
-    const q = gameState.questions[gameState.currentQIdx];
-    if (!q) return;
-    
-    gameState.timer = CONFIG.QUESTION_TIME;
-    gameState.padHoldStart = null;
-    gameState.padHoldIdx = null;
-    
-    // 1. สุ่มตำแหน่งป้ายใหม่จาก 8 slots โดยให้ห่างกันพอ (กันคนยืนแช่)
-    const selectedSlots = selectPadSlots();
-    gameState.padPositions = selectedSlots;
-    
-    // รีเซ็ต anti-camping detection ตอนเปลี่ยนข้อ
-    resetCampingDetection();
-    
-    // 2. Shuffle answer content
-    const shuffledChoices = q.choices.map((choice, idx) => ({ choice, originalIdx: idx }));
-    const randomized = shuffleArray(shuffledChoices);
-    
-    // 3. Update pads (ตำแหน่ง + เนื้อหา)
-    answerPads.forEach((pad, idx) => {
-      const pos = selectedSlots[idx];
-      const choice = randomized[idx];
-      
-      // อัปเดตพิกัดพร้อม transition (CSS)
-      pad.style.left = pos.x + '%';
-      pad.style.top = pos.y + '%';
-      pad.style.opacity = '1';
-      
-      const content = pad.querySelector('.pad-content');
-      content.innerHTML = QV.formatFrac(choice.choice);
-      pad.dataset.answerIdx = choice.originalIdx;
-      pad.classList.remove('correct', 'wrong', 'holding');
-    });
-    
-    // Update question text
-    hudElements.questionCounter.textContent = `Question ${gameState.currentQIdx + 1} / ${gameState.questions.length}`;
-    hudElements.questionText.innerHTML = QV.formatFrac(q.q);
-    
-    // Hide hint
-    hudElements.hintOverlay.style.display = 'none';
-    
-    // Start timer
-    if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-      gameState.timer--;
-      updateTimerBar();
-      
-      if (gameState.timer <= 0) {
-        clearInterval(timerInterval);
-        onAnswerWrong(null); // timeout = wrong
+      // Combo 10 = invincible bonus
+      if (this.gameState.correctStreak === CONFIG.COMBO_INVINCIBLE_THRESHOLD) {
+        this.showConfetti();
+        QV.state.player.xp += 50;
+        this.gameState.score += 50;
       }
-    }, 1000);
-    
-    updateTimerBar();
-  }
 
-  function checkPadCollision() {
-    answerPads.forEach((pad, idx) => {
-      const padPos = gameState.padPositions[idx];
-      if (!padPos) return;
-      
-      const dist = distance(gameState.player.x, gameState.player.y, padPos.x, padPos.y);
-      
-      // ความเร็ว player — vx/vy เป็น normalized (-1..1) ใช้ magnitude เทียบ threshold โดยตรง
-      const speed = Math.sqrt((gameState.player.vx || 0) ** 2 + (gameState.player.vy || 0) ** 2);
-      const isStandingStill = speed < CONFIG.MOVING_THRESHOLD;
-      
-      // ตอบเฉพาะตอน: ยืนในแกนกลางป้าย (core) + หยุดยืน (ตั้งใจ)
-      const onCore = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_ANSWER_CORE);
-      const onPad = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_RADIUS);
-      
-      if (onCore && isStandingStill) {
-        // บนแกนกลางป้าย + หยุดยืน = ตั้งใจตอบ
-        if (gameState.padHoldIdx === idx) {
-          const holdTime = performance.now() - gameState.padHoldStart;
-          if (holdTime >= CONFIG.ANSWER_HOLD_TIME) {
-            onAnswer(idx);
-          }
-        } else {
-          gameState.padHoldIdx = idx;
-          gameState.padHoldStart = performance.now();
-          pad.classList.add('holding');
-        }
-      } else if (onPad && !isStandingStill) {
-        // เดินผ่านป้าย — แสดง hint ว่าต้องหยุดยืน
-        if (gameState.padHoldIdx === idx) {
-          gameState.padHoldIdx = null;
-          gameState.padHoldStart = null;
-          pad.classList.remove('holding');
-          pad.classList.add('keep-moving');
-          setTimeout(() => pad.classList.remove('keep-moving'), 400);
-        }
-      } else {
-        // ออกจากป้าย
-        if (gameState.padHoldIdx === idx) {
-          gameState.padHoldIdx = null;
-          gameState.padHoldStart = null;
-          pad.classList.remove('holding');
-        }
-      }
-    });
-  }
-
-  function onAnswer(padIdx) {
-    if (gameState.phase !== 'question') return;
-    
-    const q = gameState.questions[gameState.currentQIdx];
-    const pad = answerPads[padIdx];
-    const answerIdx = parseInt(pad.dataset.answerIdx);
-    
-    // Clear hold
-    gameState.padHoldIdx = null;
-    gameState.padHoldStart = null;
-    answerPads.forEach(p => p.classList.remove('holding'));
-    
-    if (answerIdx === q.answerIdx) {
-      onAnswerCorrect(padIdx);
+      this.loadQuestion();
     } else {
-      onAnswerWrong(padIdx);
+      this.gameState.combo = 0;
+      this.gameState.correctStreak = 0;
+      this.arenaEl.querySelector('.combo-counter').style.display = 'none';
+      this.takeDamage();
     }
+
+    QV.saveState();
   }
 
-  function onAnswerCorrect(padIdx) {
-    if (timerInterval) clearInterval(timerInterval);
-    
-    gameState.combo++;
-    const xp = CONFIG.CORRECT_XP + Math.floor(gameState.combo / 3) * 5;
-    QV.state.xp += xp;
-    // รีวอร์ด: ตอบถูกฟื้นฟูพลังงาน 1 ใจ (max 5)
-    if (QV.state.energy < 5) QV.state.energy = Math.min(5, QV.state.energy + 1);
-    QV.saveState(QV.state);
-    QV.app.toast(`Correct! +${xp} XP`);
-    
-    // Visual feedback
-    if (padIdx !== null) {
-      answerPads[padIdx].classList.add('correct');
-    }
-    
-    // Damage boss
-    gameState.bossHp--;
-    bossTakeDamage();
-    updateHUD();
-    
-    // Check win
-    if (gameState.bossHp <= 0 || gameState.currentQIdx >= gameState.questions.length - 1) {
-      setTimeout(() => endGame(true), 1000);
-    } else {
-      // Next question
-      setTimeout(() => {
-        gameState.currentQIdx++;
-        loadQuestion();
-      }, 1500);
-    }
-  }
-
-  function onAnswerWrong(padIdx) {
-    if (timerInterval) clearInterval(timerInterval);
-    
-    gameState.combo = 0;
-    
-    // Visual feedback
-    if (padIdx !== null) {
-      answerPads[padIdx].classList.add('wrong');
-    }
-    
-    // Show hint
-    const q = gameState.questions[gameState.currentQIdx];
-    if (q.hint) {
-      hudElements.hintOverlay.innerHTML = `💡 Hint: ${QV.formatFrac(q.hint)}`;
-      hudElements.hintOverlay.style.display = 'block';
-      
-      setTimeout(() => {
-        hudElements.hintOverlay.style.display = 'none';
-      }, 3000);
-    }
-    
-    // Damage player
-    QV.state.energy -= CONFIG.ATTACK_DAMAGE;
-    QV.saveState(QV.state);
-    updateHUD();
-    
-    // Visual feedback
-    playerSprite.classList.add('hit');
-    setTimeout(() => playerSprite.classList.remove('hit'), 300);
-    
-    // Check lose
-    if (QV.state.energy <= 0) {
-      endGame(false);
-    } else {
-      // Next question
-      setTimeout(() => {
-        gameState.currentQIdx++;
-        if (gameState.currentQIdx >= gameState.questions.length) {
-          endGame(false);
-        } else {
-          loadQuestion();
-        }
-      }, 2000);
-    }
-  }
-
-  function bossTakeDamage() {
-    if (!bossSprite) return;
-    
-    bossSprite.classList.add('damaged');
-    setTimeout(() => bossSprite.classList.remove('damaged'), 300);
-  }
-
-  // ===== HUD =====
-  function updateHUD() {
-    // Hearts
-    hudElements.hearts.innerHTML = '❤️'.repeat(Math.max(0, QV.state.energy));
-    
-    // Boss HP
-    const hpBars = Array(CONFIG.BOSS_HP).fill(0).map((_, i) => {
-      return `<div class="boss-hp-segment ${i < gameState.bossHp ? 'active' : ''}"></div>`;
-    }).join('');
-    hudElements.bossHpBar.innerHTML = hpBars;
-  }
-
-  function updateTimerBar() {
-    const percent = (gameState.timer / CONFIG.QUESTION_TIME) * 100;
-    hudElements.timerBar.style.width = percent + '%';
-    
-    if (gameState.timer <= 5) {
-      hudElements.timerBar.classList.add('critical');
-    } else {
-      hudElements.timerBar.classList.remove('critical');
-    }
-  }
-
-  // ===== WIN / LOSE =====
-  function endGame(won) {
-    gameState.phase = won ? 'win' : 'lose';
-    
-    // Stop everything — set null ก่อน cancel เพื่อกัน race condition
-    const oldRafId = rafId;
-    rafId = null;
-    if (oldRafId) cancelAnimationFrame(oldRafId);
-    if (attackTimer) clearTimeout(attackTimer);
-    if (timerInterval) clearInterval(timerInterval);
-    attackTimer = null;
-    timerInterval = null;
-    
-    // Clear attacks
-    gameState.attacks.forEach(attack => {
-      if (attack.element && attack.element.parentNode) attack.element.remove();
-      if (attack.warnElement && attack.warnElement.parentNode) attack.warnElement.remove();
-      if (attack.drops) {
-        attack.drops.forEach(drop => {
-          if (drop.element && drop.element.parentNode) drop.element.remove();
-          if (drop.shadowElement && drop.shadowElement.parentNode) drop.shadowElement.remove();
-        });
-      }
-    });
-    gameState.attacks = [];
-    
-    // Show end screen
-    if (won) {
-      const boss = BOSS_DATA[gameState.boss];
-      const badgeId = boss.badgeId;
-      
-      if (!QV.state.badges.includes(badgeId)) {
-        QV.state.badges.push(badgeId);
-      }
-      // บันทึกว่าพิชิตบอสแล้ว (ใช้ในหน้าแผนที่)
-      if (!Array.isArray(QV.state.bossDefeated)) QV.state.bossDefeated = [];
-      if (!QV.state.bossDefeated.includes(gameState.boss)) {
-        QV.state.bossDefeated.push(gameState.boss);
-      }
-      QV.state.xp += CONFIG.WIN_XP;
-      QV.saveState(QV.state);
-      
-      hudElements.endScreen.innerHTML = `
-        <div class="end-content win">
-          <div class="confetti"></div>
-          <h1>🎉 VICTORY! 🎉</h1>
-          <p>You defeated ${boss.name}!</p>
-          <p class="xp-reward">+${CONFIG.WIN_XP} XP</p>
-          <div class="badge-earned">
-            <span style="font-size:2.5rem;">🏆</span>
-            <p>Badge Earned!</p>
-          </div>
-          <button id="btn-end-map" class="btn-primary">Back to Map</button>
-        </div>
-      `;
-      
-      hudElements.endScreen.style.display = 'flex';
-      
-      // Confetti animation
-      createConfetti();
-      
-    } else {
-      QV.state.xp += CONFIG.LOSE_XP;
-      // คืนพลังงาน 1 ใจ เพื่อไม่ให้เกมตัน
-      if (QV.state.energy < 1) QV.state.energy = 1;
-      QV.saveState(QV.state);
-      
-      hudElements.endScreen.innerHTML = `
-        <div class="end-content lose">
-          <h1>💫 Not This Time</h1>
-          <p>Keep practicing and try again!</p>
-          <p class="xp-reward">+${CONFIG.LOSE_XP} XP</p>
-          <button id="btn-end-retry" class="btn-primary">Try Again</button>
-          <button id="btn-end-map" class="btn-secondary">Back to Map</button>
-        </div>
-      `;
-      
-      hudElements.endScreen.style.display = 'flex';
-    }
-    
-    // Event listeners
-    const btnMap = hudElements.endScreen.querySelector('#btn-end-map');
-    const btnRetry = hudElements.endScreen.querySelector('#btn-end-retry');
-    
-    if (btnMap) {
-      btnMap.addEventListener('click', () => {
-        QV.app.show('map');
-      });
-    }
-    
-    if (btnRetry) {
-      btnRetry.addEventListener('click', () => {
-        QV.app.show('boss', { boss: gameState.boss });
-      });
-    }
-  }
-
-  function createConfetti() {
-    const confettiContainer = hudElements.endScreen.querySelector('.confetti');
-    if (!confettiContainer) return;
-    
-    for (let i = 0; i < 50; i++) {
-      const confetti = document.createElement('div');
-      confetti.className = 'confetti-piece';
-      confetti.style.left = Math.random() * 100 + '%';
-      confetti.style.animationDelay = Math.random() * 3 + 's';
-      confetti.style.backgroundColor = ['#38BDF8', '#6EE7B7', '#E9A568', '#3B6DFF'][Math.floor(Math.random() * 4)];
-      confettiContainer.appendChild(confetti);
-    }
-  }
-
-  // ===== GAME LOOP =====
-  function gameLoop(timestamp) {
-    if (!rafId || gameState.phase !== 'question') {
-      rafId = null;
+  takeDamage() {
+    // Shield blocks first hit
+    if (this.gameState.player.shielded) {
+      this.gameState.player.shielded = false;
       return;
     }
-    
-    const deltaTime = lastFrameTime ? (timestamp - lastFrameTime) / 1000 : 0;
-    lastFrameTime = timestamp;
-    
-    // Update player movement
-    updatePlayerMovement(deltaTime);
-    
-    // Update attacks
-    updateAttacks(timestamp);
-    
-    // Anti-camping detection
-    updateCampingDetection(timestamp);
-    
-    // Check pad collision
-    checkPadCollision();
-    
-    rafId = requestAnimationFrame(gameLoop);
-  }
 
-  // ===== SCREEN API =====
-  function mount(params) {
-    // Clear previous instance ก่อน mount ใหม่ (กัน timer เก่าค้าง)
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-    if (attackTimer) { clearTimeout(attackTimer); attackTimer = null; }
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    
-    // Reset state
-    gameState = {
-      boss: params.boss || 'mathos',
-      bossHp: CONFIG.BOSS_HP,
-      questions: getRandomQuestions(10),
-      currentQIdx: 0,
-      timer: CONFIG.QUESTION_TIME,
-      combo: 0,
-      
-      attacks: [],
-      
-      padHoldStart: null,
-      padHoldIdx: null,
-      
-      phase: 'question',
-      
-      player: { x: 57.5, y: 88, vx: 0, vy: 0, facingLeft: false, frozen: false },
-      
-      campingDetection: {
-        lastPos: { x: 57.5, y: 88 },
-        stillStartTime: null,
-        warned: false,
-        attackScheduled: false
-      },
-      
-      keys: {},
-      joystick: { active: false, startX: 0, startY: 0, deltaX: 0, deltaY: 0 }
-    };
-    
-    // Create DOM
-    const dom = createDOM(gameState.boss);
-    
-    // Clear and mount
-    const app = document.getElementById('app');
-    app.innerHTML = '';
-    app.appendChild(dom);
-    
-    // Setup input — remove ก่อน add ป้องกัน listener ซ้ำจากการ mount ซ้อน
-    document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('keyup', handleKeyUp);
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keyup', handleKeyUp);
-    setupJoystick();
-    firstAttack = true;
-    
-    // Start game
-    updateHUD();
-    loadQuestion();
-    scheduleNextAttack();
-    
-    lastFrameTime = 0;
-    rafId = requestAnimationFrame(gameLoop);
-  }
-
-  function render(state, params) {
-    // Not used (we use mount directly)
-    return null;
-  }
-
-  function cleanup() {
-    // Stop everything
-    if (rafId) cancelAnimationFrame(rafId);
-    if (attackTimer) clearTimeout(attackTimer);
-    if (campingAttackTimer) { clearTimeout(campingAttackTimer); campingAttackTimer = null; }
-    if (timerInterval) clearInterval(timerInterval);
-    
-    // Remove event listeners
-    document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('keyup', handleKeyUp);
-    
-    // Remove DOM ก่อน clear reference
-    if (container && container.parentNode) {
-      container.remove();
+    // Combo invincible
+    if (this.gameState.correctStreak >= CONFIG.COMBO_INVINCIBLE_THRESHOLD) {
+      return;
     }
-    
-    // Clear references
-    container = null;
-    bossSprite = null;
-    playerSprite = null;
-    answerPads = [];
-    hudElements = {};
-    
-    rafId = null;
-    attackTimer = null;
-    campingAttackTimer = null;
-    timerInterval = null;
+
+    this.gameState.player.hp--;
+    this.updateHPDisplay();
+
+    if (this.gameState.player.hp <= 0) {
+      this.showDefeat();
+    }
   }
 
-  // ลงทะเบียน screen กับ QV
-  if (typeof QV !== 'undefined' && QV.app) {
-    QV.app.screens.boss = { render, mount, cleanup };
+  updateHPDisplay() {
+    const hearts = this.arenaEl.querySelectorAll('.hp-heart');
+    hearts.forEach((heart, i) => {
+      heart.style.opacity = i < this.gameState.player.hp ? '1' : '0.3';
+    });
   }
 
-  // เผื่อ debug
-  window.QVBossTest = { mount, loadQuestion };
+  updateCampingDetection(dt) {
+    const px = this.gameState.player.x;
+    const py = this.gameState.player.y;
+    const dx = px - this.gameState.lastPosition.x;
+    const dy = py - this.gameState.lastPosition.y;
+    const moved = Math.sqrt(dx * dx + dy * dy);
 
-})();
+    if (moved < 1) {
+      this.gameState.campingTimer += dt;
+      if (this.gameState.campingTimer > CONFIG.CAMPING_WARNING_TIME) {
+        if (!this.gameState.campingWarning) {
+          this.gameState.campingWarning = true;
+          this.arenaEl.querySelector('.camping-warning').style.display = 'block';
+          // Targeted fireball
+          this.spawnTargetedFireball(px, py);
+        }
+      }
+    } else {
+      this.gameState.campingTimer = 0;
+      this.gameState.campingWarning = false;
+      this.arenaEl.querySelector('.camping-warning').style.display = 'none';
+      this.gameState.lastPosition = { x: px, y: py };
+    }
+  }
+
+  updateAttacks(dt) {
+    this.attackTimer += dt;
+    if (this.attackTimer > this.config.baseDifficulty.attackInterval) {
+      this.attackTimer = 0;
+      this.spawnAttack();
+    }
+
+    this.gameState.attacks = this.gameState.attacks.filter(attack => {
+      if (attack.type === 'fireball') {
+        attack.x += attack.vx * dt * 0.06;
+        attack.y += attack.vy * dt * 0.06;
+
+        const dx = attack.x - this.gameState.player.x;
+        const dy = attack.y - this.gameState.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 3) {
+          this.takeDamage();
+          attack.el.remove();
+          return false;
+        }
+
+        if (attack.x < 0 || attack.x > 100 || attack.y < 0 || attack.y > 100) {
+          attack.el.remove();
+          return false;
+        }
+
+        attack.el.style.left = `${attack.x}%`;
+        attack.el.style.top = `${attack.y}%`;
+      } else if (attack.type === 'ice') {
+        attack.duration -= dt;
+        if (attack.duration <= 0) {
+          attack.el.remove();
+          this.gameState.player.frozen = false;
+          return false;
+        }
+
+        const dx = attack.x - this.gameState.player.x;
+        const dy = attack.y - this.gameState.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 15 && !this.gameState.player.frozen) {
+          this.gameState.player.frozen = true;
+          setTimeout(() => {
+            this.gameState.player.frozen = false;
+          }, CONFIG.ICE_DURATION);
+        }
+      } else if (attack.type === 'portal') {
+        attack.duration -= dt;
+        if (attack.duration <= 0) {
+          attack.el.remove();
+          return false;
+        }
+
+        const dx = attack.x - this.gameState.player.x;
+        const dy = attack.y - this.gameState.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 5 && !attack.activated) {
+          attack.activated = true;
+          setTimeout(() => {
+            this.gameState.player.x = Math.random() * 80 + 10;
+            this.gameState.player.y = Math.random() * 80 + 10;
+          }, CONFIG.PORTAL_WARP_DELAY);
+        }
+      }
+
+      return true;
+    });
+  }
+
+  spawnAttack() {
+    const types = ['fireball', 'ice', 'portal'];
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    if (type === 'fireball') {
+      const side = Math.floor(Math.random() * 4);
+      let x, y, vx, vy;
+      if (side === 0) { x = Math.random() * 100; y = 0; vx = 0; vy = 1; }
+      else if (side === 1) { x = 100; y = Math.random() * 100; vx = -1; vy = 0; }
+      else if (side === 2) { x = Math.random() * 100; y = 100; vx = 0; vy = -1; }
+      else { x = 0; y = Math.random() * 100; vx = 1; vy = 0; }
+
+      const el = document.createElement('div');
+      el.className = 'attack-fireball';
+      el.style.cssText = `
+        position: absolute;
+        width: 3vw;
+        height: 3vw;
+        background: ${this.config.attackTheme.fireball.color};
+        border-radius: 999px;
+        box-shadow: 0 0 15px ${this.config.attackTheme.fireball.color};
+        left: ${x}%;
+        top: ${y}%;
+        transform: translate(-50%, -50%);
+        z-index: 5;
+      `;
+      this.arenaEl.appendChild(el);
+      this.gameState.attacks.push({ type: 'fireball', x, y, vx, vy, el });
+    } else if (type === 'ice') {
+      const x = Math.random() * 80 + 10;
+      const y = Math.random() * 80 + 10;
+
+      const el = document.createElement('div');
+      el.className = 'attack-ice';
+      el.style.cssText = `
+        position: absolute;
+        width: 30vw;
+        height: 30vw;
+        background: radial-gradient(circle, ${this.config.attackTheme.ice.color}33, transparent);
+        border: 2px dashed ${this.config.attackTheme.ice.color};
+        border-radius: 50%;
+        left: ${x}%;
+        top: ${y}%;
+        transform: translate(-50%, -50%);
+        z-index: 5;
+      `;
+      this.arenaEl.appendChild(el);
+      this.gameState.attacks.push({ type: 'ice', x, y, duration: CONFIG.ICE_DURATION, el });
+    } else if (type === 'portal') {
+      const x = Math.random() * 80 + 10;
+      const y = Math.random() * 80 + 10;
+
+      const el = document.createElement('div');
+      el.className = 'attack-portal';
+      el.style.cssText = `
+        position: absolute;
+        width: 8vw;
+        height: 8vw;
+        background: radial-gradient(circle, ${this.config.attackTheme.portal.color}, transparent);
+        border: 3px solid ${this.config.attackTheme.portal.color};
+        border-radius: 50%;
+        left: ${x}%;
+        top: ${y}%;
+        transform: translate(-50%, -50%);
+        animation: portalSpin 2s linear infinite;
+        z-index: 5;
+      `;
+      this.arenaEl.appendChild(el);
+      this.gameState.attacks.push({ type: 'portal', x, y, duration: 5000, activated: false, el });
+    }
+  }
+
+  spawnTargetedFireball(targetX, targetY) {
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+    if (side === 0) { x = Math.random() * 100; y = 0; }
+    else if (side === 1) { x = 100; y = Math.random() * 100; }
+    else if (side === 2) { x = Math.random() * 100; y = 100; }
+    else { x = 0; y = Math.random() * 100; }
+
+    const dx = targetX - x;
+    const dy = targetY - y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const vx = (dx / len) * CONFIG.FIREBALL_SPEED;
+    const vy = (dy / len) * CONFIG.FIREBALL_SPEED;
+
+    const el = document.createElement('div');
+    el.className = 'attack-fireball targeted';
+    el.style.cssText = `
+      position: absolute;
+      width: 4vw;
+      height: 4vw;
+      background: #FF4444;
+      border-radius: 999px;
+      box-shadow: 0 0 20px #FF4444;
+      left: ${x}%;
+      top: ${y}%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+    `;
+    this.arenaEl.appendChild(el);
+    this.gameState.attacks.push({ type: 'fireball', x, y, vx, vy, el });
+  }
+
+  triggerEvent() {
+    const events = ['asteroid', 'blackhole', 'gift'];
+    const event = events[Math.floor(Math.random() * events.length)];
+
+    const eventCard = document.createElement('div');
+    eventCard.className = 'event-card';
+    eventCard.innerHTML = `<img src="assets/event_${event}.webp" alt="${event}">`;
+    this.arenaEl.appendChild(eventCard);
+
+    setTimeout(() => eventCard.remove(), 3000);
+
+    if (event === 'asteroid') {
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+          const x = Math.random() * 100;
+          const y = -10;
+          const el = document.createElement('div');
+          el.className = 'event-asteroid';
+          el.style.cssText = `
+            position: absolute;
+            width: 5vw;
+            height: 5vw;
+            background: url('assets/event_asteroid.webp') center/cover;
+            border-radius: 50%;
+            left: ${x}%;
+            top: ${y}%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+          `;
+          this.arenaEl.appendChild(el);
+          
+          const fallInterval = setInterval(() => {
+            const currentTop = parseFloat(el.style.top);
+            el.style.top = `${currentTop + 2}%`;
+            
+            const dx = x - this.gameState.player.x;
+            const dy = currentTop - this.gameState.player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 5) {
+              this.takeDamage();
+              clearInterval(fallInterval);
+              el.remove();
+            }
+            
+            if (currentTop > 110) {
+              clearInterval(fallInterval);
+              el.remove();
+            }
+          }, 50);
+        }, i * 500);
+      }
+    } else if (event === 'blackhole') {
+      const centerX = 50;
+      const centerY = 50;
+      const duration = 6000;
+      const startTime = performance.now();
+
+      const blackholeInterval = setInterval(() => {
+        const elapsed = performance.now() - startTime;
+        if (elapsed > duration) {
+          clearInterval(blackholeInterval);
+          return;
+        }
+
+        // Pull pads toward center
+        this.gameState.pads.forEach((pad, i) => {
+          const dx = centerX - pad.x;
+          const dy = centerY - pad.y;
+          pad.x += dx * 0.02;
+          pad.y += dy * 0.02;
+
+          const padEl = this.arenaEl.querySelector(`.answer-pad[data-index="${i}"]`);
+          if (padEl) {
+            padEl.style.left = `${pad.x}%`;
+            padEl.style.top = `${pad.y}%`;
+          }
+        });
+      }, 50);
+    } else if (event === 'gift') {
+      this.gameState.player.hp = Math.min(3, this.gameState.player.hp + 1);
+      this.updateHPDisplay();
+    }
+  }
+
+  showConfetti() {
+    for (let i = 0; i < 30; i++) {
+      const confetti = document.createElement('div');
+      confetti.style.cssText = `
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: ${['#FFD700', '#FF69B4', '#00CED1'][Math.floor(Math.random() * 3)]};
+        left: ${Math.random() * 100}%;
+        top: ${Math.random() * 100}%;
+        animation: confettiFall ${1 + Math.random()}s linear;
+        z-index: 100;
+      `;
+      this.arenaEl.appendChild(confetti);
+      setTimeout(() => confetti.remove(), 2000);
+    }
+  }
+
+  gameLoop(timestamp = 0) {
+    if (!this.running) return;
+    const dt = timestamp - this.lastTime;
+    this.lastTime = timestamp;
+
+    // Time Attack countdown
+    if (this.gameState.timeLimit > 0) {
+      this.gameState.timeRemaining -= dt / 1000;
+      const taTimer = this.arenaEl.querySelector('.ta-timer');
+      if (taTimer) taTimer.textContent = Math.ceil(Math.max(0, this.gameState.timeRemaining)) + 's';
+      if (this.gameState.timeRemaining <= 0) {
+        this.showTimeUp();
+        return;
+      }
+    }
+
+    if (dt < 100) {
+      this.updatePlayer(dt);
+      this.updatePet(dt);
+      this.checkPadCollision();
+      this.updateCampingDetection(dt);
+      this.updateAttacks(dt);
+    }
+
+    this.rafId = requestAnimationFrame((t) => this.gameLoop(t));
+  }
+
+  timeAttackBonus() {
+    const bonus = Math.floor(this.gameState.timeRemaining * 10);
+    QV.state.player.xp += bonus;
+    this.gameState.score += bonus;
+    this.cleanup();
+    const victory = document.createElement('div');
+    victory.className = 'boss-result victory';
+    victory.innerHTML = `
+      <h2>หมดเวลา — ทำสำเร็จ!</h2>
+      <p>ตอบครบ 10 ข้อ | เวลาเหลือ: ${Math.ceil(this.gameState.timeRemaining)}s</p>
+      <p class="score">คะแนนรวม: ${this.gameState.score} XP (+โบนัสเวลา ${bonus} XP)</p>
+      ${this.onTimeUpCallback ? '' : '<button class="btn btn-gold" id="btn-ta-back">กลับห้องโถง</button>'}
+    `;
+    this.root.appendChild(victory);
+    const btn = document.getElementById('btn-ta-back');
+    if (btn) btn.addEventListener('click', () => QV.app.show('boss-hall'));
+    if (this.onTimeUpCallback) this.onTimeUpCallback(this.gameState.score);
+    QV.saveState();
+    if (typeof QV.refreshEnergy === 'function') QV.refreshEnergy(QV.state);
+  }
+
+  showTimeUp() {
+    this.cleanup();
+    const defeat = document.createElement('div');
+    defeat.className = 'boss-result defeat';
+    defeat.innerHTML = `
+      <h2>หมดเวลา!</h2>
+      <p>ตอบได้ ${this.gameState.questionCount} ข้อ</p>
+      ${this.onTimeUpCallback ? '<button class="btn btn-gold" id="btn-tu-back">กลับห้องโถง</button>' : '<button class="btn btn-gold" id="btn-tu-back">กลับห้องโถง</button>'}
+    `;
+    this.root.appendChild(defeat);
+    document.getElementById('btn-tu-back').addEventListener('click', () => QV.app.show('boss-hall'));
+    if (this.onTimeUpCallback) this.onTimeUpCallback(null);
+  }
+
+  showVictory() {
+    this.cleanup();
+    
+    const victory = document.createElement('div');
+    victory.className = 'boss-result victory';
+    victory.innerHTML = `
+      <h2>ชนะแล้ว!</h2>
+      <img src="${this.config.bossImg}" alt="${this.config.name}">
+      <p>${this.config.victoryMsg}</p>
+      <p class="score">คะแนน: ${this.gameState.score} XP</p>
+      <button class="btn btn-gold" id="btn-victory-home">กลับบ้าน</button>
+      <button class="btn btn-primary" id="btn-victory-rematch">ท้าใหม่อีกครั้ง</button>
+    `;
+    this.root.appendChild(victory);
+
+    // Bonus XP และ Badge
+    const victoryXp = Math.floor(this.gameState.score * 0.5);
+    if (victoryXp > 0) QV.state.player.xp += victoryXp;
+    const bossBadge = `boss-${this.config.id}`;
+    QV.state.player.badges = QV.state.player.badges || [];
+    if (!QV.state.player.badges.includes(bossBadge)) QV.state.player.badges.push(bossBadge);
+
+    // Leaderboard
+    QV.state.leaderboard = QV.state.leaderboard || [];
+    QV.state.leaderboard.push({ name: QV.state.player.name || 'นักเรียน', xp: this.gameState.score, boss: this.config.name, timestamp: Date.now() });
+    QV.state.leaderboard.sort((a, b) => b.xp - a.xp);
+    QV.state.leaderboard = QV.state.leaderboard.slice(0, 10);
+
+    QV.state.boss = QV.state.boss || {};
+    QV.state.boss.selectedItem = null;
+    QV.saveState();
+    if (typeof QV.refreshEnergy === 'function') QV.refreshEnergy(QV.state);
+
+    document.getElementById('btn-victory-home').addEventListener('click', () => QV.app.show('boss-hall'));
+    document.getElementById('btn-victory-rematch').addEventListener('click', () => QV.app.show('boss', { bossId: this.config.id }));
+  }
+
+  showDefeat() {
+    this.cleanup();
+    const defeat = document.createElement('div');
+    defeat.className = 'boss-result defeat';
+    defeat.innerHTML = `
+      <h2>พ่ายแพ้!</h2>
+      <img src="${this.config.bossImg}" alt="${this.config.name}" style="width:180px;border-radius:12px;">
+      <p>${this.config.defeatMsg}</p>
+      <p class="score">ตอบถูก: ${this.gameState.questionCount} ข้อ | คอมโบสูงสุด: ${this.gameState.maxCombo || this.gameState.combo}x</p>
+      <button class="btn btn-gold" id="btn-defeat-rematch">แก้อีกครั้ง</button>
+      <button class="btn btn-primary" id="btn-defeat-home">กลับห้องโถง</button>
+    `;
+    this.root.appendChild(defeat);
+    document.getElementById('btn-defeat-rematch').addEventListener('click', () => QV.app.show('boss', { bossId: this.config.id }));
+    document.getElementById('btn-defeat-home').addEventListener('click', () => QV.app.show('boss-hall'));
+  }
+
+  cleanup() {
+    this.running = false;
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    if (this.attackTimerId) clearTimeout(this.attackTimerId);
+    if (this.eventTimerId) clearTimeout(this.eventTimerId);
+    if (this.comboTimerId) clearTimeout(this.comboTimerId);
+    if (this.keydownHandler) window.removeEventListener('keydown', this.keydownHandler);
+    if (this.keyupHandler) window.removeEventListener('keyup', this.keyupHandler);
+    this.rafId = null;
+    this.attackTimerId = null;
+    this.eventTimerId = null;
+  }
+}
+
+// ลงทะเบียน screen กับ app.js (contract: render(state, params), mount(params))
+if (typeof QV !== 'undefined' && QV.app) {
+  let currentBattle = null;
+  QV.app.screens.boss = {
+    render(state, params) {
+      return null;
+    },
+    mount(params) {
+      const container = document.getElementById('app');
+      container.innerHTML = '';
+      currentBattle = new BossBattle(container, params?.bossId || 'mathos');
+      currentBattle.mount();
+    },
+    cleanup() {
+      if (currentBattle) { try { currentBattle.cleanup(); } catch (e) { console.error(e); } currentBattle = null; }
+    }
+  };
+}

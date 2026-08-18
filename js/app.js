@@ -22,7 +22,7 @@ QV.app.init = function() {
   if (!QV.state.player.name) {
     QV.app.show('landing');
   } else {
-    QV.app.show('map');
+    QV.app.show('boss-hall');
   }
 
   // ซ่อน preloader
