@@ -32,10 +32,12 @@ QV.screens.mission = {
 
     // ตรวจสอบ energy
     if (state.energy <= 0) {
+      const mgRemaining = QV.game.minigameRemaining(state);
       return `<div class="screen-mission text-center">
         <h2 style="color: var(--accent-cyan);">⚠️ พลังงานหมดแล้ว!</h2>
-        <p>รอพรุ่งนี้พลังงานจะเติมเต็ม 5 หัวใจ หรือลองเลนโซนอื่น</p>
-        <button class="btn btn-primary" id="btn-mission-nrg-back">กลับสู่แผนที่</button>
+        <p>ไม่ต้องรอพรุ่งนี้เพียงอย่างเดียว — ใช้สิทธิ์เล่นมินิเกมฟื้นพลังงานได้ (${mgRemaining} ครั้งที่เหลือวันนี้)</p>
+        ${mgRemaining > 0 ? `<button class="btn btn-primary" id="btn-mission-nrg-minigame" style="margin: 12px 8px;">⚡ เล่นมินิเกมฟื้นพลังงาน</button>` : `<p style="color: var(--danger); font-size: 14px; margin-top: 8px;">🔒 มินิเกมฟื้นพลังงานใช้ครบ 3 ครั้งแล้ว พรุ่งนี้มาใหม่นะ</p>`}
+        <button class="btn btn-secondary" id="btn-mission-nrg-back" style="margin: 12px 8px;">🗺️ กลับสู่แผนที่</button>
       </div>`;
     }
 
@@ -68,8 +70,8 @@ QV.screens.mission = {
     if (screen) {
       const bg = screen.getAttribute('data-bg');
       if (bg) {
-        const url = bg.indexOf('://') >= 0 ? bg : '../' + bg.replace(/^assets\//, '');
-        screen.style.backgroundImage = `linear-gradient(rgba(7, 8, 26, 0.72), rgba(7, 8, 26, 0.88)), url('${url}')`;
+        const url = bg.indexOf('://') >= 0 ? bg : bg;
+        screen.style.setProperty('--mission-bg', `url('${url}')`);
       }
     }
     const state = QV.state;
@@ -85,6 +87,8 @@ QV.screens.mission = {
     };
     bindBack('btn-mission-fail-back');
     bindBack('btn-mission-nrg-back');
+    const btnMg = document.getElementById('btn-mission-nrg-minigame');
+    if (btnMg) btnMg.addEventListener('click', () => QV.app.show('minigame'));
 
     const questionArea = document.getElementById('question-area');
     const hintArea = document.getElementById('hint-area');
@@ -118,8 +122,9 @@ QV.screens.mission = {
         const def = QV.ITEM_DEFS[id];
         const count = state.items[id] || 0;
         const labels = { shield: '🛡️ โล่', compass: '🧭 เข็มทิศ', telescope: '🔭 กล้อง' };
+        const icon = def && def.image ? `<img src="${def.image}" alt="${labels[id]}" class="item-icon">` : '';
         return `<button class="btn btn-item item-btn" data-item="${id}" ${count <= 0 ? 'disabled' : ''}>
-          ${labels[id]} <span class="item-count">×${count}</span>
+          ${icon} ${labels[id]} <span class="item-count">×${count}</span>
         </button>`;
       }).join('') + `
         <button class="btn btn-secondary item-btn" id="btn-hint">💡 คำใบ้</button>

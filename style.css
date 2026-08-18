@@ -443,7 +443,7 @@ body {
     min-height: 100vh;
     padding: 24px 16px;
     position: relative;
-    background: linear-gradient(rgba(7, 8, 26, 0.72), rgba(7, 8, 26, 0.88)), url('../assets/mission_bg.jpg') center/cover no-repeat fixed;
+    background: linear-gradient(rgba(7, 8, 26, 0.72), rgba(7, 8, 26, 0.88)), var(--mission-bg, url('../assets/mission_bg.jpg')) center/cover no-repeat fixed;
 }
 /* Timer */
 .timer-row {
@@ -1094,4 +1094,241 @@ body {
 @keyframes twinkle {
     0% { opacity: 0.25; }
     100% { opacity: 0.85; }
+}
+
+/* === MINIGAME (Energy Recovery) === */
+.screen-minigame .minigame-container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    text-align: center;
+}
+
+.screen-minigame .minigame-container h2 {
+    font-size: 1.9rem;
+    margin-bottom: 8px;
+    color: var(--accent-gold);
+}
+
+.screen-minigame .subtitle {
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin-bottom: 18px;
+}
+
+.screen-minigame .minigame-info {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.screen-minigame .minigame-info span {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: var(--accent-cyan);
+}
+
+.screen-minigame .minigame-timer {
+    max-width: 520px;
+    width: 100%;
+    margin: 0 auto 18px;
+    justify-content: center;
+}
+.screen-minigame .minigame-timer .timer-bar-track {
+    flex: 0 0 320px;
+    width: 320px;
+}
+#minigame-timer-text {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-width: 110px;
+}
+
+.screen-minigame .minigame-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 0 auto 18px;
+    max-width: 440px;
+}
+
+.screen-minigame .minigame-card {
+    aspect-ratio: 1;
+    perspective: 900px;
+    cursor: pointer;
+}
+
+.screen-minigame .minigame-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.45s;
+    transform-style: preserve-3d;
+}
+
+.screen-minigame .minigame-card.flipped .minigame-card-inner {
+    transform: rotateY(180deg);
+}
+
+.screen-minigame .minigame-card.matched .minigame-card-inner {
+    transform: rotateY(180deg);
+    animation: minigame-pulse 0.5s ease-in-out;
+}
+
+.screen-minigame .minigame-card-front,
+.screen-minigame .minigame-card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(6, 214, 160, 0.35);
+}
+
+.screen-minigame .minigame-card-front {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 60%, #06d6a0 100%);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    text-shadow: 0 0 12px rgba(6, 214, 160, 0.8);
+}
+
+.screen-minigame .minigame-card-back {
+    background: linear-gradient(135deg, #0b1026 0%, #162447 100%);
+    transform: rotateY(180deg);
+    font-size: 2.4rem;
+}
+
+.screen-minigame .minigame-card.matched .minigame-card-back {
+    border-color: var(--success);
+    box-shadow: 0 0 18px rgba(46, 213, 115, 0.5);
+}
+/* ไอคอนภาพในการ์ดจับคู่ (แทน emoji) */
+.screen-minigame .minigame-card-back img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    filter: drop-shadow(0 0 6px rgba(120, 200, 255, 0.45));
+}
+.screen-minigame .minigame-card-back {
+    font-size: 0;
+}
+
+@keyframes minigame-pulse {
+    0% { transform: scale(1) rotateY(180deg); }
+    50% { transform: scale(1.12) rotateY(180deg); }
+    100% { transform: scale(1) rotateY(180deg); }
+}
+
+.match-animation {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4rem;
+    z-index: 10000;
+    animation: minigame-fadeout 0.6s forwards;
+    pointer-events: none;
+}
+
+@keyframes minigame-fadeout {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -70%) scale(1.6); }
+}
+
+.screen-minigame .minigame-stats {
+    margin-top: 10px;
+}
+
+.screen-minigame .matched-count {
+    font-size: 1.1rem;
+    color: var(--text-dim);
+}
+
+.screen-minigame .minigame-result-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.screen-minigame .modal-content {
+    background: linear-gradient(135deg, #0b1026 0%, #162447 100%);
+    padding: 36px 32px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 400px;
+    width: 85%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(6, 214, 160, 0.4);
+}
+
+.screen-minigame .modal-content h3 {
+    font-size: 1.7rem;
+    margin-bottom: 12px;
+    color: var(--accent-gold);
+}
+
+.screen-minigame .modal-content p {
+    font-size: 1rem;
+    margin-bottom: 22px;
+    line-height: 1.6;
+    color: #dfe8f5;
+    white-space: pre-line;
+}
+
+.screen-minigame #minigame-result-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.screen-minigame .limit-message {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    padding: 20px;
+    border-radius: 14px;
+    color: #fff;
+    margin: 24px 0;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.screen-minigame .stats-box {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 16px;
+    border-radius: 12px;
+    margin: 16px 0 24px;
+    font-size: 1rem;
+    color: #dfe8f5;
+}
+
+@media (max-width: 600px) {
+    .screen-minigame .minigame-grid {
+        gap: 8px;
+        max-width: 92vw;
+    }
+    .screen-minigame .minigame-card-back {
+        font-size: 1.8rem;
+    }
+    .screen-minigame .minigame-info {
+        gap: 8px;
+    }
 }

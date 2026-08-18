@@ -35,6 +35,7 @@ QV.screens.map = {
           ${Array.from({ length: QV.MAX_ENERGY }, (_, i) => {
             return `<span class="heart${i < state.energy ? '' : ' empty'}">${i < state.energy ? '❤️' : '🤍'}</span>`;
           }).join('')}
+          ${state.energy <= 0 && QV.game.minigameRemaining(state) > 0 ? `<button class="btn btn-item" id="btn-map-minigame" style="margin-left: 8px;">⚡ ฟื้นพลังงาน</button>` : ''}
         </div>
       </div>
     `;
@@ -101,6 +102,9 @@ QV.screens.map = {
         QV.app.show('leaderboard');
       });
     }
+    // ปุ่มฟื้นพลังงานจากมินิเกม (แสดงเฉพาะ energy <= 0)
+    const btnMg = document.getElementById('btn-map-minigame');
+    if (btnMg) btnMg.addEventListener('click', () => QV.app.show('minigame'));
 
     // ปุ่ม reset
     const btnReset = document.getElementById('btn-reset');

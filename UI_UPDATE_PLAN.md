@@ -100,3 +100,40 @@
 
 ## QA Checklist
 - node qa_questions.js → 125; node repro.js → screens ครบ; browser flow เต็ม
+
+## QA local (r=40) — 10:59 — พบปัญหาภาพ bg mission ไม่แสดง
+- ✅ เศษส่วน setแนว + timer + items + hint ทำงาน
+- ❌ ฉากหลังก่อนตอบแสดงเป็น dark ธรรมดา — ภาพ bg ไม่แสดง (data-bg มีค่า, mount set --mission-bg)
+- สาเหตุสันนิษฐาน: CSS background shorthand ไม่รับ var ใน layer list อย่างคาดหมาย → ต้องตรวจว่า CSS .screen-mission ใช้ var(--mission-bg) ตรงไหน หรือ mission.js set inline backgroundImage ตรง (ซึ่งผมเพิ่งแก้เป็น set --mission-bg) และ CSS เดิม hardcode url('../assets/mission_bg.jpg') → ตอนนี้แสดง landing_bg ที่เป็น copy เดิม...แต่ใน screenshot จอ dark แปลว่า CSS อาจ override ไม่ทำงาน หรือ mount ยังใช้ code เก่า (รัน cache?) — reload ?r=40 แล้ว
+- แก้ถัดไป: ตรวจ CSS ของ .screen-mission (grep lines 442-470) — ให้ use `background-image: linear-gradient(..), var(--mission-bg, url('../assets/mission_bg.jpg'))` แยกจาก background-color
+
+## รอบ 5 — ภาพไอเทม/ยานจาก user (11:00)
+- user ส่งภาพไอเทม 3 + ยาน บนพื้นแมเจนต้า (จาก upload/) — ลบแมเจนต้า+crop+resize+webp เสร็จแล้ว:
+  - assets/item_shield.webp (256), item_compass.webp (256), item_telescope.webp (256), explorer_ship.webp (512) — ขอบสะอาดดี (glow ม่วงอ่อน เหลือนิดที่ขอบ shield/ship ดู OK)
+- user บอก: "เอาจุดนั้นไปใส่ — ถ้าจะแก้ code โยนให้ Opus ทำได้" — หมายถึงแก้ bg mission code ให้ Claude Opus ผ่าน API (call_claude.py)
+- config.js ITEM_DEFS image path เดิมเป็น .svg — ต้องเปลี่ยนเป็น .webp (item_shield.webp ฯลฯ) + explorer_ship.webp
+- index.html/landing.js อ้าง explorer_ship.png — ต้องเป็น .webp
+- mission.js: mount set --mission-bg แต่ CSS .screen-mission (บรรทัด 442-447) ใช้ `background: ...var(--mission-bg, url('../assets/mission_bg.jpg')) center/cover no-repeat fixed` — จาก console: resolvedBg = url("http://localhost:8777/mission_bg_numberon.jpg") ผิด path! ขาด assets/ เพราะ replace path ใน mission.js: `'../' + bg.replace(/^assets\//, '')` → bg='assets/mission_bg_numberon.jpg' → '../mission_bg_numberon.jpg' → ผิด path
+  - **แก้:** ใช้ `url('${bg}')` (bg อยู่แล้ว = assets/xxx) — แต่ URL resolve จาก index.html root คือ /assets/xxx.html? ไม่ — index.html ที่ root, mission.js ชี้ ../assets? ไม่ — bg path ควรเป็น absolute `/assets/mission_bg_numberon.jpg` หรือ `assets/mission_bg_numberon.jpg` (จาก root)
+
+## รอบ 6 — Minigame + deploy (11:10)
+- minigame.js (QV.screens.minigame: จับคู่ดวงดาว 4x4, 45วิ, ชนะ +1 ใจ +30 XP, แพ้ +10 XP, 3 ครั้ง/วัน) + CSS ท้าย style.css + game_state.js (minigameRemaining/getMiniGamePlays/minigamePlay) + config.js (minigamePlays ใน newState) + mission.js (ปุ่ม energy น้อย + ปุ่ม minigame) + galaxy_map.js (⚡ ฟื้นพลังงาน ใน energy-hearts เมื่อ energy<=0) + landing.js guide + index.html (minigame.js ก่อน leaderboard) — node --check OK ครบ
+- QA local map ปกติ: player "น้องทดสอบ" XP 50 โซน 3/5 เลข, energy 4/5
+- เหลือ QA: ฉากหลัง mission ตามดาว (numberon zone3), ไอเทม webp, minigame flow, summary
+- local server 8777 รันแล้ว
+
+## QA ตรวจ (11:11)
+- ✅ ฉากหลัง mission ตามดาว: --mission-bg = url('assets/mission_bg_numberon.jpg') โหลดจาก /assets/ ถูก path — ภาพ numberon (ดาว + ตัวเลข + จรวด) แสดงสวย
+- ✅ ไอเทม webp แสดงใน items bar (item_shield.webp ฯลฯ) — added <img class="item-icon"> ใน renderItems
+- ✅ timer, progress dots, คำใบ้, hit/wrong ทำงาน
+- ❓ คำถาม 5²×5³ zone3 แสดง ansIdx=0 (5⁵) — user ตอบ 5⁶ แล้วระบบบอก "ผิด!" — ตูเองตอบผิด (ตอบ 5⁶ = index1 ผิด) = ทำงานถูกต้อง ไม่ใช่ bug
+- energy ตอนนี้ 3/5 (ทดสอบ zone ต่อจะไปจน 0 เพื่อดู minigame) หรือตั้ง localStorage energy=0 ตรงๆ
+- ถัดไป: ทดสอบ minigame flow (ตั้ง energy=0 หรือผ่าน zone จน energy หมด)
+
+## QA minigame (11:12)
+- ✅ map energy=0 → ป้ายสถานะแสดง 🤍5ดวง + ปุ่ม "⚡ ฟื้นพลังงาน" (btn-map-minigame) — ทำงาน
+- ✅ เข้า minigame ได้: ⚡ Stellar Harvest, การ์ด 4x4, timer 44วิ, info chips (❤️+1 ใจ / ✨+30 XP / 🕐45วิ / 🔄เหลือ3ครั้ง), จับคู่ 0/8
+- ❌ พบบกพร่อง: timer bar fill เขียวล้นเลยแถบ (overflow — timer-bar-track height 12px แต่ fill แสดงยืดเกิน, แถบ fill กว้างเกิน track, timer text "เวลาเหลือ: 455" ตัด) — ตรวจ CSS: .screen-minigame .minigame-timer ใช้ .timer-bar-track ของ mission (height 12px OK) แต่ fill กว้างเกิน = ไม่มี overflow:hidden บน .timer-bar-track ของ minigame? (mission timer-row ใช้ .timer-bar-track เดิม) — จริงๆ fill width 98% ของ track — ใน screenshot เหน็บ fill กินแนวตั้งเกิน? ไม่ — ภาพแสดง fill ยืดถึงขอบขวาเกิน (455 ตัดข้าง) — อาจเป็นเพราะ .timer-row ของ mission มี max-width:520px + margin auto แต่ .minigame-timer ซ้อน class เดิม → timer-bar-track มี flex:1 → width เป็น 0 เพราะไม่มี parent flex? ตรวจ: .minigame-timer ครอบ .timer-bar-track — track เป็น flex? ใช่ flex:1 → ใน container ไม่ใช่ flex มัน stretch เต็ม
+- ไขโค้ด: minigame CSS .screen-minigame .minigame-timer {max-width:520px;margin:0 auto 18px;} — track width 100% ควร ok — แต่ screenshot แสดง fill เกิน → ปัญหาจริง: .timer-bar-track มี flex:1 ใน .timer-row (mission) → ใน minigame container เป็น flex? .timer-row display:flex → fill กินความกว้าง flex 100% ของ .minigame-timer=440px — ไม่ควรมีปัญหา...ต้อง reload ตรวจอีกที (อาจเป็น screenshot timing)
+- ถัดไป: เล่นจับคู่ 1 คู่ ตรวจ matched + test win modal, ตรวจ timer bar อีกครั้ง
+- หลัง QA: deploy (make_vercel_payload.py → shrink → deploy_to_vercel MCP) → URL https://questverse-space-explorer.vercel.app

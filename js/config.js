@@ -88,19 +88,19 @@ QV.ITEM_DEFS = {
     id: "shield",
     name: "โล่ป้องกัน",
     desc: "ตอบผิดไม่เสียพลังงาน",
-    image: "assets/item_shield.svg"
+    image: "assets/item_shield.webp"
   },
   compass: {
     id: "compass",
     name: "เข็มทิศอวกาศ",
     desc: "ตัดตัวเลือกผิด 1 ตัว",
-    image: "assets/item_compass.svg"
+    image: "assets/item_compass.webp"
   },
   telescope: {
     id: "telescope",
     name: "กล้องส่องทางไกล",
     desc: "ขอดูคำใบ้ 1 ครั้ง",
-    image: "assets/item_telescope.svg"
+    image: "assets/item_telescope.webp"
   }
 };
 
@@ -246,7 +246,8 @@ QV.newState = function() {
       telescope: 2
     },
     badges: [],
-    fastCorrect5s: 0
+    fastCorrect5s: 0,
+    minigamePlays: {}
   };
 };
 

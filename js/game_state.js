@@ -160,5 +160,38 @@ QV.game = {
     }
     
     return 'locked';
+  },
+
+  /**
+   * จำนวนการเล่น minigame ที่เหลือในวันนี้ (ฟรี 3 ครั้ง/วัน)
+   */
+  minigameRemaining(state) {
+    const todayKey = QV.todayKey();
+    const count = (state.minigamePlays && state.minigamePlays[todayKey]) || 0;
+    return Math.max(0, 3 - count);
+  },
+
+  /**
+   * จำนวนครั้งที่เล่น minigame ไปแล้ววันนี้
+   */
+  getMiniGamePlays(state) {
+    const todayKey = QV.todayKey();
+    return (state.minigamePlays && state.minigamePlays[todayKey]) || 0;
+  },
+
+  /**
+   * บันทึกผล minigame และมอบรางวัล (ชนะ: +1 ใจ +30 XP / แพ้: +10 XP)
+   */
+  minigamePlay(state, won) {
+    const todayKey = QV.todayKey();
+    state.minigamePlays = state.minigamePlays || {};
+    state.minigamePlays[todayKey] = (state.minigamePlays[todayKey] || 0) + 1;
+    if (won) {
+      state.energy = Math.min(state.energy + 1, QV.MAX_ENERGY);
+      state.xp += 30;
+    } else {
+      state.xp += 10;
+    }
+    return this.checkBadgeEarns(state);
   }
 };
