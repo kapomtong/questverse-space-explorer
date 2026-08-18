@@ -12,13 +12,15 @@
     
     // Collision
     PLAYER_RADIUS: 2.2, // vw (ชนจริง ≈ 20px)
-    PAD_RADIUS: 7, // vw (ยืนใกล้ป้าย = ตอบได้ — ขยายให้เด็กถือป้ายง่ายขึ้น)
+    PAD_RADIUS: 4.5, // vw (ป้ายคำตอบ — ขนาดจริงของป้าย)
+    PAD_ANSWER_CORE: 2.2, // vw — แกนกลางป้ายที่นับว่า "ตั้งใจยืนตอบ" (ไม่ตอบเองทั้งที่เดินผ่าน)
     ATTACK_RADIUS: 2.5, // vw
     
     // Timing
     FIRST_ATTACK_DELAY: 6000, // ms — ให้เวลา 6 วิแรกก่อนบอสโจมตีครั้งแรก
     QUESTION_TIME: 30, // วินาที
-    ANSWER_HOLD_TIME: 400, // ms ที่ต้องยืนบนป้าย
+    ANSWER_HOLD_TIME: 800, // ms ที่ต้องยืนบนป้าย (ป้องกันตอบเองทั้งที่เดินผ่าน)
+    MOVING_THRESHOLD: 3, // %/s — ต่ำกว่านี้นับว่า "หยุดยืน" (ตั้งใจตอบ)
     ATTACK_INTERVAL_MIN: 5000, // ms (เริ่มช้า ให้เวลาคิด)
     ATTACK_INTERVAL_MAX: 8000,
     
@@ -726,23 +728,40 @@
       const padPos = CONFIG.PADS[idx];
       const dist = distance(gameState.player.x, gameState.player.y, padPos.x, padPos.y);
       
-      if (dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_RADIUS)) {
-        // On pad — dist ในหน่วย vw เทียบ PLAYER_RADIUS+PAD_RADIUS (vw) ✓
+      // ความเร็ว player (vw/s) — คำนวณจาก velocity %/s → vw/s
+      const aspect = window.innerHeight / window.innerWidth;
+      const vyVw = Math.abs(gameState.player.vy || 0) * aspect * CONFIG.PLAYER_SPEED;
+      const vxVw = Math.abs(gameState.player.vx || 0) * CONFIG.PLAYER_SPEED;
+      const speedVw = Math.sqrt(vxVw * vxVw + vyVw * vyVw);
+      const isStandingStill = speedVw < CONFIG.MOVING_THRESHOLD;
+      
+      // ตอบเฉพาะตอน: ยืนในแกนกลางป้าย (core) + หยุดยืน (ตั้งใจ)
+      const onCore = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_ANSWER_CORE);
+      const onPad = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_RADIUS);
+      
+      if (onCore && isStandingStill) {
+        // บนแกนกลางป้าย + หยุดยืน = ตั้งใจตอบ
         if (gameState.padHoldIdx === idx) {
-          // Continue holding
           const holdTime = performance.now() - gameState.padHoldStart;
           if (holdTime >= CONFIG.ANSWER_HOLD_TIME) {
-            // Answer!
             onAnswer(idx);
           }
         } else {
-          // Start holding
           gameState.padHoldIdx = idx;
           gameState.padHoldStart = performance.now();
           pad.classList.add('holding');
         }
+      } else if (onPad && !isStandingStill) {
+        // เดินผ่านป้าย — แสดง hint ว่าต้องหยุดยืน
+        if (gameState.padHoldIdx === idx) {
+          gameState.padHoldIdx = null;
+          gameState.padHoldStart = null;
+          pad.classList.remove('holding');
+          pad.classList.add('keep-moving');
+          setTimeout(() => pad.classList.remove('keep-moving'), 400);
+        }
       } else {
-        // Not on pad
+        // ออกจากป้าย
         if (gameState.padHoldIdx === idx) {
           gameState.padHoldIdx = null;
           gameState.padHoldStart = null;

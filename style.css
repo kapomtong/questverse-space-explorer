@@ -1478,6 +1478,16 @@ body {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.07); }
 }
+.answer-pad.keep-moving .pad-content {
+    border-color: var(--accent-gold);
+    opacity: 0.55;
+    animation: pad-shake 0.4s ease-in-out;
+}
+@keyframes pad-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
 
 /* ---- Attack Tiles ---- */
 #attack-tiles {

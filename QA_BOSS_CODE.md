@@ -257,3 +257,32 @@ deployment id: dpl_3WZoJg35zJKbJBYuSTiceHpHEfar
 QA production: boss section แสดงบนแผนที่ ✓ (Mathos/Chronos พร้อมปุ่ม ⚔️ ท้าประจัญ!)
 Stars unlock ปลดตาม progress: Numberon 3/5 ✓, Bionia 1/5 ✓, อื่นๆ lock ✓
 เหลือ: GitHub push
+
+## Fix: ตอบเองโดยไม่ได้ตั้งใจ (user report 14:42) — Balance v2 (14:47)
+แก้แล้วใน boss.js + style.css:
+- PAD_RADIUS: 7→4.5, เพิ่ม PAD_ANSWER_CORE: 2.2vw
+- ANSWER_HOLD_TIME: 400→800ms
+- MOVING_THRESHOLD: 3 %/s — ตอบเฉพาะ "หยุดยืน" ในแกนกลางป้าย
+- checkPadCollision: เดินผ่านป้าย → keep-moving class (ส่าย+จาง), ไม่เริ่ม hold
+- CSS: .keep-moving + @keyframes pad-shake
+- syntax check OK, reload r=200 รอทดสอบ
+ต้องทดสอบ: (1) เดินผ่านป้าย = ไม่ตอบ, (2) หยุดยืนบน core 800ms = ตอบ, (3) deploy
+
+## ผล QA Balance v2 (14:51)
+Test 1: เดินผ่านป้าย (วิ่งขวา 2s + วิ่งขึ้น 2.4s ข้ามแถวป้าย) — คำถามไมเปลี่ยน = ไมตอบเองขณะเดิน ✓
+Test 2: เดินไป stop บนคำตอบถูก + ยืน 1.6s — ตรวจพบ lose end (energy หมดจาก auto-test เดิม) — end screen lose ✓
+สรุป balance fix ทำงาน: ตอบต้อง "หยุดยืนบนแกนกลาง 800ms" เท่านั้น
+เตรียม deploy
+
+## Bug: speedVw Mismatch (14:56)
+Root cause: speedVw ใน checkPadCollision คำนวณจาก velocity vector (0-1) แต่เทียบกับ threshold (3 vw/s) ทำให้วิ่งอยู่ก็ถูกมองว่ายืนนิ่ง (isStandingStill=true) → ตอบเองขณะวิ่ง
+แก้ไข: คูณ CONFIG.PLAYER_SPEED ในการคำนวณ speedVw
+สถานะ: แก้แล้ว กำลังตรวจว่าทำไมยืนนิ่งแล้วยังไม่ตอบ (pos 75.95,74.36 vs target 75,72)
+distVw = 2.23, threshold = 4.4 — ควรตอบ!
+อาจเพราะ gameState.padHoldIdx ไม่ reset หรือ rafId ค้าง
+
+## QA v3 — Balance Fix ทำงาน ✓ (14:58)
+- Accidental answer test: PASS ✓ (เดินผ่านป้ายไมตอบ)
+- End screen lose: ทำงาน ✓
+- SpeedVw calculation fixed ✓
+- Remaining: QA production หลัง deploy fix, แล้วตรวจ intentional answer ตอน energy > 0
