@@ -1437,6 +1437,7 @@ body {
     aspect-ratio: 1 / 1;
     transform: translate(-50%, -50%);
     z-index: 4;
+    transition: left 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .pad-content {
     width: 100%;
@@ -1882,4 +1883,34 @@ body {
 @media (min-width: 601px) and (hover: none) {
     /* แท็บเล็ตแบบแตะ: แสดง joystick เช่นกัน */
     .joystick-container { display: block; }
+}
+
+/* ===== Camping warning (anti-camping system) ===== */
+.camping-warning {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 25;
+    background: rgba(239, 71, 111, 0.92);
+    color: #fff;
+    font-size: clamp(16px, 2.6vw, 24px);
+    font-weight: 800;
+    padding: 10px 22px;
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(239, 71, 111, 0.75);
+    pointer-events: none;
+    text-align: center;
+    white-space: nowrap;
+}
+.camping-warning.pulse {
+    animation: camping-pulse 0.5s ease-in-out infinite;
+}
+@keyframes camping-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.85; }
+}
+/* fireball ที่บอสเล็งใส่นักเลงแช่ — เร็วและแรงขึ้น */
+.atk-tile.fireball.camping-attack img {
+    filter: drop-shadow(0 0 22px rgba(239, 71, 111, 1));
 }

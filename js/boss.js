@@ -14,13 +14,16 @@
     PLAYER_RADIUS: 2.2, // vw (ชนจริง ≈ 20px)
     PAD_RADIUS: 4.5, // vw (ป้ายคำตอบ — ขนาดจริงของป้าย)
     PAD_ANSWER_CORE: 2.2, // vw — แกนกลางป้ายที่นับว่า "ตั้งใจยืนตอบ" (ไม่ตอบเองทั้งที่เดินผ่าน)
+    PAD_MIN_DISTANCE: 18, // vw — ระยะห่างขั้นต่ำระหว่างป้าย (กันป้ายซ้อน/บังกัน)
     ATTACK_RADIUS: 2.5, // vw
     
     // Timing
     FIRST_ATTACK_DELAY: 6000, // ms — ให้เวลา 6 วิแรกก่อนบอสโจมตีครั้งแรก
     QUESTION_TIME: 30, // วินาที
     ANSWER_HOLD_TIME: 800, // ms ที่ต้องยืนบนป้าย (ป้องกันตอบเองทั้งที่เดินผ่าน)
-    MOVING_THRESHOLD: 3, // %/s — ต่ำกว่านี้นับว่า "หยุดยืน" (ตั้งใจตอบ)
+    MOVING_THRESHOLD: 0.15, // normalized speed (vx/vy = -1..1) — ต่ำกว่านี้นับว่า "หยุดยืน" (ตั้งใจตอบ)
+    CAMPING_TIME: 4500, // ms — ยืนแช่ (ไม่บนป้าย) นานเกินนี้ถือว่า camping
+    CAMPING_ATTACK_DELAY: 1200, // ms — บอสจะยิงไฟลูกใส่ camper หลังเตือน
     ATTACK_INTERVAL_MIN: 5000, // ms (เริ่มช้า ให้เวลาคิด)
     ATTACK_INTERVAL_MAX: 8000,
     
@@ -32,13 +35,18 @@
     WIN_XP: 200,
     LOSE_XP: 30,
     
-    // Answer pads positions (% of viewport)
-    PADS: [
-      { x: 55, y: 55 }, // top-left
-      { x: 75, y: 55 }, // top-right
-      { x: 55, y: 72 }, // bottom-left
-      { x: 75, y: 72 }  // bottom-right
-    ]
+    // Answer pads slots — 8 ตำแหน่งกระจายรอบสนาม (สุ่ม 4 จุดทุกข้อ)
+    PAD_SLOTS: [
+      { x: 15, y: 40 }, // ซ้ายบน
+      { x: 40, y: 30 }, // กลางบน
+      { x: 70, y: 30 }, // ขวาบน
+      { x: 85, y: 45 }, // ขวากลาง
+      { x: 15, y: 70 }, // ซ้ายล่าง
+      { x: 40, y: 80 }, // กลางล่าง
+      { x: 70, y: 80 }, // ขวาล่าง
+      { x: 85, y: 65 }  // ขวากลางล่าง
+    ],
+    PADS: [] // จะถูกสุ่มใน runtime
   };
 
   const BOSS_DATA = {
@@ -73,6 +81,15 @@
     
     padHoldStart: null,
     padHoldIdx: null,
+    padPositions: [], // เก็บพิกัด x,y ปัจจุบันของป้าย 0-3
+    
+    // Anti-camping system
+    campingDetection: {
+      lastPos: { x: 57.5, y: 88 },
+      stillStartTime: null,
+      warned: false,
+      attackScheduled: false
+    },
     
     phase: 'question', // question | answer | win | lose
     
@@ -83,6 +100,7 @@
 
   let rafId = null;
   let attackTimer = null;
+  let campingAttackTimer = null; // timer ยิงไฟลูกใส่ camper
   let timerInterval = null;
   let lastFrameTime = 0;
   let firstAttack = true;
@@ -153,6 +171,40 @@
     return result;
   }
 
+  // เลือก 4 ตำแหน่งป้ายจาก 8 slots โดยให้ห่างกันพอ (กันป้ายซ้อน)
+  function selectPadSlots() {
+    const shuffled = shuffleArray([...CONFIG.PAD_SLOTS]);
+    const selected = [];
+    
+    for (let i = 0; i < shuffled.length && selected.length < 4; i++) {
+      const candidate = shuffled[i];
+      
+      // ตรวจสอบว่าไม่ใกล้ตำแหน่งที่เลือกไว้แล้วเกินไป
+      let tooClose = false;
+      for (let j = 0; j < selected.length; j++) {
+        const dist = distance(candidate.x, candidate.y, selected[j].x, selected[j].y);
+        if (dist < CONFIG.PAD_MIN_DISTANCE) {
+          tooClose = true;
+          break;
+        }
+      }
+      
+      if (!tooClose) {
+        selected.push(candidate);
+      }
+    }
+    
+    // ถ้าหาไม่ครบ 4 (แทบไม่เกิด) ก็เอาที่เหลือมาเติม
+    while (selected.length < 4 && shuffled.length > selected.length) {
+      const candidate = shuffled[selected.length];
+      if (!selected.find(s => s.x === candidate.x && s.y === candidate.y)) {
+        selected.push(candidate);
+      }
+    }
+    
+    return selected;
+  }
+
   // ===== DOM CREATION =====
   function createDOM(bossId) {
     const boss = BOSS_DATA[bossId];
@@ -204,6 +256,9 @@
           </div>
         </div>
         
+        <!-- Camping warning -->
+        <div id="camping-warning" class="camping-warning" style="display:none;">⚠️ ยืนนิ่งนานไป! บอสกำลังเล็ง!</div>
+        
         <!-- Hint overlay -->
         <div id="hint-overlay" class="hint-overlay"></div>
         
@@ -221,17 +276,18 @@
     playerSprite = container.querySelector('#player-sprite');
     updatePlayerPosition();
 
-    // Create answer pads
+    // Create answer pads (สร้างรอไว้ 4 อัน ตำแหน่งจริงจะสุ่มใน loadQuestion)
     const padsContainer = container.querySelector('#answer-pads');
-    CONFIG.PADS.forEach((pos, idx) => {
+    for (let i = 0; i < 4; i++) {
       const pad = document.createElement('div');
       pad.className = 'answer-pad';
-      pad.style.left = pos.x + '%';
-      pad.style.top = pos.y + '%';
+      pad.style.left = '50%';
+      pad.style.top = '50%';
+      pad.style.opacity = '0'; // ซ่อนไว้ก่อน loadQuestion
       pad.innerHTML = '<div class="pad-content"></div>';
       padsContainer.appendChild(pad);
       answerPads.push(pad);
-    });
+    }
 
     // HUD elements
     hudElements = {
@@ -243,7 +299,8 @@
       bossHpBar: container.querySelector('#boss-hp-bar'),
       hintOverlay: container.querySelector('#hint-overlay'),
       endScreen: container.querySelector('#end-screen'),
-      attackTiles: container.querySelector('#attack-tiles')
+      attackTiles: container.querySelector('#attack-tiles'),
+      campingWarning: container.querySelector('#camping-warning')
     };
 
     return container;
@@ -529,11 +586,13 @@
       const elapsed = now - attack.startTime;
       
       if (attack.type === 'fireball') {
-        if (elapsed < 700) {
+        const warnDuration = attack.isCampingPunishment ? 500 : 700;
+        
+        if (elapsed < warnDuration) {
           // Warning phase
         } else if (elapsed < attack.duration) {
           // Travel phase
-          const travelProgress = Math.min(1, (elapsed - 700) / (attack.duration - 700));
+          const travelProgress = Math.min(1, (elapsed - warnDuration) / (attack.duration - warnDuration));
           const x = attack.x + (attack.targetX - attack.x) * travelProgress;
           const y = attack.y + (attack.targetY - attack.y) * travelProgress;
           
@@ -679,6 +738,133 @@
     updateHUD();
   }
 
+  // ===== CAMPING DETECTION (กันคนยืนแช่) =====
+  function updateCampingDetection(now) {
+    if (gameState.phase !== 'question' || gameState.player.frozen) return;
+    
+    const camping = gameState.campingDetection;
+    
+    // คำนวณความเร็ว (magnitude ของ velocity vector ที่ normalized แล้ว)
+    const speed = Math.sqrt((gameState.player.vx || 0) ** 2 + (gameState.player.vy || 0) ** 2);
+    const isMoving = speed > CONFIG.MOVING_THRESHOLD;
+    
+    // ตรวจว่าอยู่บนป้ายใดป้ายหนึ่งหรือไม่ (อยู่บนป้าย = ไม่ใช่ camping)
+    let onAnyPad = false;
+    for (let i = 0; i < gameState.padPositions.length; i++) {
+      const padPos = gameState.padPositions[i];
+      if (!padPos) continue;
+      const dist = distance(gameState.player.x, gameState.player.y, padPos.x, padPos.y);
+      if (dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_RADIUS)) {
+        onAnyPad = true;
+        break;
+      }
+    }
+    
+    // ถ้ายืนนิ่ง (และไม่อยู่บนป้าย) → เริ่มนับเวลา
+    if (!isMoving && !onAnyPad) {
+      if (!camping.stillStartTime) {
+        camping.stillStartTime = now;
+        camping.lastPos = { x: gameState.player.x, y: gameState.player.y };
+      } else {
+        const stillDuration = now - camping.stillStartTime;
+        
+        // ตรวจว่ายังอยู่ตำแหน่งเดิมหรือไม่ (drift เล็กน้อยยอมได้)
+        const movedDist = distance(camping.lastPos.x, camping.lastPos.y, gameState.player.x, gameState.player.y);
+        if (movedDist > 3) {
+          // ขยับออกจากตำแหน่งเดิม → รีเซ็ต
+          resetCampingDetection();
+          return;
+        }
+        
+        // เตือนเมื่อยืนนิ่งนานผ่านเกณฑ์
+        if (stillDuration >= CONFIG.CAMPING_TIME && !camping.warned) {
+          camping.warned = true;
+          showCampingWarning(true);
+          
+          // นัดยิงไฟลูกใส่ camper หลังเตือน
+          if (!camping.attackScheduled) {
+            camping.attackScheduled = true;
+            campingAttackTimer = setTimeout(() => {
+              if (gameState.phase === 'question') {
+                createTargetedFireball(gameState.player.x, gameState.player.y);
+              }
+              camping.attackScheduled = false;
+            }, CONFIG.CAMPING_ATTACK_DELAY);
+          }
+        }
+      }
+    } else {
+      // เคลื่อนที่ หรือ ยืนบนป้าย → รีเซ็ต
+      if (camping.stillStartTime || camping.warned) {
+        resetCampingDetection();
+      }
+    }
+  }
+
+  function resetCampingDetection() {
+    const camping = gameState.campingDetection;
+    camping.stillStartTime = null;
+    camping.warned = false;
+    camping.attackScheduled = false;
+    showCampingWarning(false);
+    
+    if (campingAttackTimer) {
+      clearTimeout(campingAttackTimer);
+      campingAttackTimer = null;
+    }
+  }
+
+  function showCampingWarning(show) {
+    if (!hudElements.campingWarning) return;
+    
+    if (show) {
+      hudElements.campingWarning.style.display = 'block';
+      hudElements.campingWarning.classList.add('pulse');
+    } else {
+      hudElements.campingWarning.style.display = 'none';
+      hudElements.campingWarning.classList.remove('pulse');
+    }
+  }
+
+  // ยิงไฟลูกเล็งใส่ตำแหน่งที่ camper ยืน (เร็วกว่าปกติ)
+  function createTargetedFireball(targetX, targetY) {
+    const attack = {
+      type: 'fireball',
+      x: BOSS_DATA[gameState.boss].x,
+      y: BOSS_DATA[gameState.boss].y,
+      targetX,
+      targetY,
+      startTime: performance.now(),
+      duration: 2000, // เร็วกว่าปกติ (500ms warn + 1500ms travel)
+      warned: false,
+      hit: false,
+      isCampingPunishment: true
+    };
+    
+    gameState.attacks.push(attack);
+    
+    const tile = document.createElement('div');
+    tile.className = 'atk-tile fireball camping-attack';
+    tile.style.left = attack.x + '%';
+    tile.style.top = attack.y + '%';
+    tile.innerHTML = '<img src="assets/boss_fireball.webp" alt="Fireball">';
+    hudElements.attackTiles.appendChild(tile);
+    attack.element = tile;
+    
+    const line = document.createElement('div');
+    line.className = 'warn-ring';
+    line.style.left = attack.x + '%';
+    line.style.top = attack.y + '%';
+    const angle = Math.atan2(targetY - attack.y, targetX - attack.x) * 180 / Math.PI;
+    line.style.transform = `rotate(${angle}deg)`;
+    hudElements.attackTiles.appendChild(line);
+    attack.warnElement = line;
+    
+    setTimeout(() => {
+      if (line.parentNode) line.remove();
+    }, 500);
+  }
+
   // ===== QUESTIONS =====
   function loadQuestion() {
     const q = gameState.questions[gameState.currentQIdx];
@@ -688,17 +874,31 @@
     gameState.padHoldStart = null;
     gameState.padHoldIdx = null;
     
-    // Shuffle answer positions
+    // 1. สุ่มตำแหน่งป้ายใหม่จาก 8 slots โดยให้ห่างกันพอ (กันคนยืนแช่)
+    const selectedSlots = selectPadSlots();
+    gameState.padPositions = selectedSlots;
+    
+    // รีเซ็ต anti-camping detection ตอนเปลี่ยนข้อ
+    resetCampingDetection();
+    
+    // 2. Shuffle answer content
     const shuffledChoices = q.choices.map((choice, idx) => ({ choice, originalIdx: idx }));
     const randomized = shuffleArray(shuffledChoices);
     
-    // Update pads
+    // 3. Update pads (ตำแหน่ง + เนื้อหา)
     answerPads.forEach((pad, idx) => {
+      const pos = selectedSlots[idx];
       const choice = randomized[idx];
+      
+      // อัปเดตพิกัดพร้อม transition (CSS)
+      pad.style.left = pos.x + '%';
+      pad.style.top = pos.y + '%';
+      pad.style.opacity = '1';
+      
       const content = pad.querySelector('.pad-content');
       content.innerHTML = QV.formatFrac(choice.choice);
       pad.dataset.answerIdx = choice.originalIdx;
-      pad.classList.remove('correct', 'wrong');
+      pad.classList.remove('correct', 'wrong', 'holding');
     });
     
     // Update question text
@@ -725,15 +925,14 @@
 
   function checkPadCollision() {
     answerPads.forEach((pad, idx) => {
-      const padPos = CONFIG.PADS[idx];
+      const padPos = gameState.padPositions[idx];
+      if (!padPos) return;
+      
       const dist = distance(gameState.player.x, gameState.player.y, padPos.x, padPos.y);
       
-      // ความเร็ว player (vw/s) — คำนวณจาก velocity %/s → vw/s
-      const aspect = window.innerHeight / window.innerWidth;
-      const vyVw = Math.abs(gameState.player.vy || 0) * aspect * CONFIG.PLAYER_SPEED;
-      const vxVw = Math.abs(gameState.player.vx || 0) * CONFIG.PLAYER_SPEED;
-      const speedVw = Math.sqrt(vxVw * vxVw + vyVw * vyVw);
-      const isStandingStill = speedVw < CONFIG.MOVING_THRESHOLD;
+      // ความเร็ว player — vx/vy เป็น normalized (-1..1) ใช้ magnitude เทียบ threshold โดยตรง
+      const speed = Math.sqrt((gameState.player.vx || 0) ** 2 + (gameState.player.vy || 0) ** 2);
+      const isStandingStill = speed < CONFIG.MOVING_THRESHOLD;
       
       // ตอบเฉพาะตอน: ยืนในแกนกลางป้าย (core) + หยุดยืน (ตั้งใจ)
       const onCore = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_ANSWER_CORE);
@@ -1026,6 +1225,9 @@
     // Update attacks
     updateAttacks(timestamp);
     
+    // Anti-camping detection
+    updateCampingDetection(timestamp);
+    
     // Check pad collision
     checkPadCollision();
     
@@ -1056,6 +1258,13 @@
       phase: 'question',
       
       player: { x: 57.5, y: 88, vx: 0, vy: 0, facingLeft: false, frozen: false },
+      
+      campingDetection: {
+        lastPos: { x: 57.5, y: 88 },
+        stillStartTime: null,
+        warned: false,
+        attackScheduled: false
+      },
       
       keys: {},
       joystick: { active: false, startX: 0, startY: 0, deltaX: 0, deltaY: 0 }
@@ -1095,6 +1304,7 @@
     // Stop everything
     if (rafId) cancelAnimationFrame(rafId);
     if (attackTimer) clearTimeout(attackTimer);
+    if (campingAttackTimer) { clearTimeout(campingAttackTimer); campingAttackTimer = null; }
     if (timerInterval) clearInterval(timerInterval);
     
     // Remove event listeners
@@ -1115,6 +1325,7 @@
     
     rafId = null;
     attackTimer = null;
+    campingAttackTimer = null;
     timerInterval = null;
   }
 
@@ -1124,6 +1335,6 @@
   }
 
   // เผื่อ debug
-  window.QVBossTest = mount;
+  window.QVBossTest = { mount, loadQuestion };
 
 })();
