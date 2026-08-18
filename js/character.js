@@ -8,9 +8,9 @@ QV.screens.character = {
 
   render: function() {
     const suits = [
-      { id: 'blue', name: 'นักบินฟ้า', image: 'suit_blue.png', color: '#38BDF8' },
-      { id: 'red', name: 'นักรบไฟ', image: 'suit_red.png', color: '#EF4444' },
-      { id: 'green', name: 'นักสำรวจใบ', image: 'suit_green.png', color: '#6EE7B7' }
+      { id: 'blue', name: 'นักบินฟ้า', image: 'suit_blue.webp', color: '#38BDF8' },
+      { id: 'red', name: 'นักรบไฟ', image: 'suit_red.webp', color: '#EF4444' },
+      { id: 'green', name: 'นักสำรวจใบ', image: 'suit_green.webp', color: '#6EE7B7' }
     ];
 
     return `

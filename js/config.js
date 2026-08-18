@@ -16,7 +16,7 @@ QV.planets = [
     nameEn: "Numberon",
     subject: "คณิตศาสตร์",
     themeColor: "#7c6ff7",
-    image: "assets/planet_numberon.png",
+    image: "assets/planet_numberon.webp",
     bg: "assets/mission_bg_numberon.jpg",
     desc: "อาณาจักรแห่งตัวเลขและรูปทรงที่รอผู้พิชิต มาเป็นนักคำนวณผู้ยิ่งใหญ่กันเถอะ!",
     zoneCount: 5
@@ -27,7 +27,7 @@ QV.planets = [
     nameEn: "Bionia",
     subject: "วิทยาศาสตร์",
     themeColor: "#06d6a0",
-    image: "assets/planet_bionia.png",
+    image: "assets/planet_bionia.webp",
     bg: "assets/mission_bg_bionia.jpg",
     desc: "โลกแห่งสิ่งมีชีวิตและธรรมชาติอันน่าอัศจรรย์ มาค้นพบความลับของจักรวาลด้วยกัน!",
     zoneCount: 5
@@ -38,7 +38,7 @@ QV.planets = [
     nameEn: "Aksara",
     subject: "ภาษาไทย",
     themeColor: "#ffd166",
-    image: "assets/planet_aksara.png",
+    image: "assets/planet_aksara.webp",
     bg: "assets/mission_bg_aksara.jpg",
     desc: "ดินแดนแห่งวรรณคดีและภาษาไทยอันงดงาม มาเรียนรู้ภาษาแม่ของเราให้มีความสุขกันเถอะ!",
     zoneCount: 5
@@ -49,7 +49,7 @@ QV.planets = [
     nameEn: "Lingua",
     subject: "ภาษาอังกฤษ",
     themeColor: "#4cc9f0",
-    image: "assets/planet_lingua.png",
+    image: "assets/planet_lingua.webp",
     bg: "assets/mission_bg_lingua.jpg",
     desc: "ดาวที่เต็มไปด้วยคำศัพท์และไวยากรณ์สากล มาพูดภาษาอังกฤษได้อย่างมั่นใจกันนะ!",
     zoneCount: 5
@@ -60,7 +60,7 @@ QV.planets = [
     nameEn: "Civilis",
     subject: "สังคมศึกษา",
     themeColor: "#f5a623",
-    image: "assets/planet_civilis.png",
+    image: "assets/planet_civilis.webp",
     bg: "assets/mission_bg_civilis.jpg",
     desc: "ดาวแห่งประวัติศาสตร์ วัฒนธรรม และสังคมโลก มาเป็นพลเมืองที่ดีของจักรวาลด้วยกัน!",
     zoneCount: 5

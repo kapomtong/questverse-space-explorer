@@ -19,7 +19,7 @@ QV.screens.map = {
     const playerStatusHtml = `
       <div class="player-status">
         <div class="player-info">
-          <img src="assets/suit_${state.player.suit}.png" alt="ชุดอวกาศ" width="64" height="64" style="border-radius:50%;">
+          <img src="assets/suit_${state.player.suit}.webp" alt="ชุดอวกาศ" width="64" height="64" style="border-radius:50%;">
           <div class="player-name">${QV.escapeHtml(state.player.name)}</div>
         </div>
         <div class="rank-chip">
