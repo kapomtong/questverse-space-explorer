@@ -36,6 +36,15 @@ skip_names = {
     'prompt_opus_v2_continuation.txt', 'prompt_opus_v4_files.txt',
     'opus_bossrush_v4.md', 'prompt_opus_v5_tail.txt', 'opus_bossrush_v5.md',
     'QA_BOSSRUSH_STATE.md', 'BOSS_RUSH_PLAN.md', 'IMG_API_NOTES.md',
+    'patch_boss_anim.py', 'patch_boss_anim2.py', 'patch_boss_anim3.py',
+    'patch_boss_fixes.py', 'patch_hall_skills.py', 'patch_overlap_skills.py',
+    'patch_landing_guide.py', 'patch_skills_css.sh', 'patch_sprites.py',
+    'ART_FIX_TASK.md', 'QA_STATE.md', 'SKILL_ICON_TASK.md', 'ASSETS_CONTEXT.md',
+    'BOSS_REVIEW.md', 'NOTES_MOBILE_FIX.md', 'optimize_assets2.py',
+    'optimize_payload_imgs.py', 'inspect_payload.py', 'call_opus_ns.py',
+    'fix_hall_comma.py', 'remove_bg.py', 'check_cut.py', 'apply_cuts.py',
+    'deploy_result.txt', 'opus_bossrush_v1.md', 'opus_out_boss_anim.md',
+    'opus_prompt_boss_anim.md',
     'ASSETS_STATUS.md', 'module1.md', 'module1a.md', 'module1b.md',
 }
 

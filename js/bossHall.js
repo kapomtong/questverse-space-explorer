@@ -46,43 +46,43 @@ QV.app.screens['boss-hall'] = {
         <h3>📘 คู่มือสกิลการสู้บอส</h3>
         <div class="skills-list">
           <div class="skill-row">
-            <div class="skill-icon">🎯</div>
+            <div class="skill-icon"><img src="assets/icons/skill_aim.webp" alt=""></div>
             <div><b>คำตอบถูก = โจมตีบอส</b> — ตอบถูก 10 ข้อ = ชนะ! เดินเท้าไปยืนบนป้ายคำตอบ แล้วบอสจะโดนดาเมจ</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🛡️</div>
+            <div class="skill-icon"><img src="assets/icons/skill_shield.webp" alt=""></div>
             <div><b>โล่พิทักษ์</b> — กันดาเมจจากการโดนบอสโจมตีครั้งแรก 1 ครั้ง</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🧪</div>
+            <div class="skill-icon"><img src="assets/icons/skill_potion.webp" alt=""></div>
             <div><b>ยาฟื้นฟู</b> — ฟื้น HP 1 ดวง ทุก 3 คำตอบถูก</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">⚡</div>
+            <div class="skill-icon"><img src="assets/icons/skill_boost.webp" alt=""></div>
             <div><b>เวลาชะลอ</b> — บอสโจมตีช้าลง 40% ใน 10 วินาทีแรก</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🔥</div>
+            <div class="skill-icon"><img src="assets/icons/skill_combo.webp" alt=""></div>
             <div><b>คอมโบ</b> — ตอบถูกติดกันสะสมคอมโบ! คอมโบยิ่งสูงยิ่งต่อแต้ม และยิ่งคอมโบสูงบอสจะโกรธจัด เร่งความเร็ว</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🐾</div>
+            <div class="skill-icon"><img src="assets/icons/skill_pet.webp" alt=""></div>
             <div><b>เพ็ท Mito</b> — แมวคู่หูจะลอยตามเจ้าไปทุกที่ คอยให้กำลังใจตลอดเวลา</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🃏</div>
+            <div class="skill-icon"><img src="assets/icons/skill_event.webp" alt=""></div>
             <div><b>อีเวนต์การ์ด</b> — ทุก 3 ข้อ อาจเกิด: ☄️ อุกกาบาต (ลูกบอมบ์ตก), 🌀 หลุมดำ (แรงดูดเข้าศูนย์กลาง), 🎁 ของขวัญ (บอสมอบไอเทมฟรี!)</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🧊</div>
+            <div class="skill-icon"><img src="assets/icons/skill_ice.webp" alt=""></div>
             <div><b>การโจมตีบอส</b> — พลุไฟ 💥 และน้ำแข็งเยือกแข็ง 🧊 (โดนแช่แข็ง = เคลื่อนที่ไม่ได้จนกว่าจะละลาย) เดินหลบไปให้ทัน!</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">🚶</div>
+            <div class="skill-icon"><img src="assets/icons/skill_dodge.webp" alt=""></div>
             <div><b>ห้ามยืนแช่!</b> — ยืนที่เดิมนานเกิน 4.5 วิ จะโดนเตือนและบอสจะโจมตีรัว การเดินและตอบสลับตำแหน่งคือกุญแจสู่ชัยชนะ</div>
           </div>
           <div class="skill-row">
-            <div class="skill-icon">❄️</div>
+            <div class="skill-icon"><img src="assets/icons/skill_freeze.webp" alt=""></div>
             <div><b>ใจเย็น ๆ</b> — บอสมี HP 3 ดวงเช่นเดียวกับเจ้า โดน 3 ครั้ง = แพ้ พิชิตบอสครบรับ Badge และ XP ปลดล็อกบอสถัดไป!</div>
           </div>
         </div>
