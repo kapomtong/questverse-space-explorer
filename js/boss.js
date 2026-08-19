@@ -777,7 +777,7 @@ class BossBattle {
         const dy = attack.y - this.gameState.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < 3) {
+        if (dist < 5) {
           this.takeDamage();
           attack.el.remove();
           return false;
@@ -802,7 +802,7 @@ class BossBattle {
         const dy = attack.y - this.gameState.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < 15 && !this.gameState.player.frozen) {
+        if (dist < 13 && !this.gameState.player.frozen) {
           this.gameState.player.frozen = true;
           setTimeout(() => {
             this.gameState.player.frozen = false;
@@ -819,7 +819,7 @@ class BossBattle {
         const dy = attack.y - this.gameState.player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < 5 && !attack.activated) {
+        if (dist < 7 && !attack.activated) {
           attack.activated = true;
           setTimeout(() => {
             this.gameState.player.x = Math.random() * 80 + 10;
@@ -848,16 +848,16 @@ class BossBattle {
       el.className = 'attack-fireball';
       el.style.cssText = `
         position: absolute;
-        width: 3vw;
-        height: 3vw;
-        background: ${this.config.attackTheme.fireball.color};
-        border-radius: 999px;
-        box-shadow: 0 0 15px ${this.config.attackTheme.fireball.color};
+        width: 7vw;
+        height: 7vw;
         left: ${x}%;
         top: ${y}%;
         transform: translate(-50%, -50%);
         z-index: 5;
+        filter: drop-shadow(0 0 12px ${this.config.attackTheme.fireball.color});
+        pointer-events: none;
       `;
+      el.innerHTML = '<img src="assets/skill_fireball.webp" alt="">';
       this.arenaEl.appendChild(el);
       this.gameState.attacks.push({ type: 'fireball', x, y, vx, vy, el });
     } else if (type === 'ice') {
@@ -868,16 +868,17 @@ class BossBattle {
       el.className = 'attack-ice';
       el.style.cssText = `
         position: absolute;
-        width: 30vw;
-        height: 30vw;
-        background: radial-gradient(circle, ${this.config.attackTheme.ice.color}33, transparent);
-        border: 2px dashed ${this.config.attackTheme.ice.color};
-        border-radius: 50%;
+        width: 26vw;
+        height: 26vw;
         left: ${x}%;
         top: ${y}%;
         transform: translate(-50%, -50%);
         z-index: 5;
+        filter: drop-shadow(0 0 20px ${this.config.attackTheme.ice.color});
+        animation: icePulse 1.6s ease-in-out infinite;
+        pointer-events: none;
       `;
+      el.innerHTML = '<img src="assets/skill_ice.webp" alt="">';
       this.arenaEl.appendChild(el);
       this.gameState.attacks.push({ type: 'ice', x, y, duration: CONFIG.ICE_DURATION, el });
     } else if (type === 'portal') {
@@ -888,17 +889,17 @@ class BossBattle {
       el.className = 'attack-portal';
       el.style.cssText = `
         position: absolute;
-        width: 8vw;
-        height: 8vw;
-        background: radial-gradient(circle, ${this.config.attackTheme.portal.color}, transparent);
-        border: 3px solid ${this.config.attackTheme.portal.color};
-        border-radius: 50%;
+        width: 14vw;
+        height: 14vw;
         left: ${x}%;
         top: ${y}%;
         transform: translate(-50%, -50%);
-        animation: portalSpin 2s linear infinite;
+        animation: portalSpin 3s linear infinite;
         z-index: 5;
+        filter: drop-shadow(0 0 16px ${this.config.attackTheme.portal.color});
+        pointer-events: none;
       `;
+      el.innerHTML = '<img src="assets/skill_portal.webp" alt="">';
       this.arenaEl.appendChild(el);
       this.gameState.attacks.push({ type: 'portal', x, y, duration: 5000, activated: false, el });
     }
@@ -922,16 +923,16 @@ class BossBattle {
     el.className = 'attack-fireball targeted';
     el.style.cssText = `
       position: absolute;
-      width: 4vw;
-      height: 4vw;
-      background: #FF4444;
-      border-radius: 999px;
-      box-shadow: 0 0 20px #FF4444;
+      width: 8vw;
+      height: 8vw;
       left: ${x}%;
       top: ${y}%;
       transform: translate(-50%, -50%);
       z-index: 5;
+      filter: drop-shadow(0 0 14px #FF4444);
+      pointer-events: none;
     `;
+    el.innerHTML = '<img src="assets/skill_fireball.webp" alt="">';
     this.arenaEl.appendChild(el);
     this.gameState.attacks.push({ type: 'fireball', x, y, vx, vy, el });
   }

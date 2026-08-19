@@ -17,7 +17,13 @@ SKIP = {'call_claude.py', 'qa_all.js', 'qa_questions.js', 'repro.js', 'fix_app.j
         'patch_boss_anim.py', 'patch_boss_anim2.py', 'patch_boss_anim3.py',
         'patch_overlap_skills.py', 'patch_hall_skills.py', 'fix_hall_comma.py',
         'patch_landing_guide.py', 'patch_skills_css.sh', 'patch_hall_comma.py',
-        'shrink_payload.py'}
+        'shrink_payload.py',
+        'arena_kawi.webp', 'arena_lex.webp', 'arena_terra.webp',
+        'arena_mathos.webp', 'arena_chronos.webp',
+        'boss_fireball.webp', 'boss_ice.webp', 'boss_portal.webp',
+        'item_shield.svg', 'item_compass.svg', 'item_telescope.svg',
+        'remove_bg.py', 'check_cut.py', 'apply_cuts.py', 'compress_assets.py',
+        'webp_assets.py', 'png_to_webp_refs.py', 'remove_magenta.cpython-312.pyc'}
 SKIP_DIR = {'prompts', 'responses', 'opus_out_v2', 'opus_out_v3', 'opus_out_v4', 'opus_out_v5', '__pycache__', 'screenshots'}
 EXT_BINARY = {'.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif', '.ico', '.mp3', '.wav'}
 

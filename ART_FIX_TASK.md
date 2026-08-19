@@ -224,3 +224,53 @@ User screenshot showed red dot = targeted fireball (#FF4444, expected). "เด�
 
 QA local (force-show joystick): simulated touch → player moved left 50% → calc(88% - 48px). MOVEMENT WORKS. Screenshot: /home/ubuntu/screenshots/localhost_2026-08-19_08-23-44_3624.webp
 Next: deploy v11, push GitHub, report.
+
+## Round 4 — Boss Skill FX Art (v12) IN PROGRESS
+User: "สกิลที่บอสปล่อยออกมามันยังเป็นแค่ก้อนกลมๆ" → replace circle divs with AI images.
+
+### Assets DONE (quality GOOD, pink fringe removed, transparent):
+- assets/skill_fireball.webp (320x320 q82): fireball plasma sphere + trailing flames
+- assets/skill_ice.webp: ice crystal zone with snowflakes
+- assets/skill_portal.webp: purple spiral portal with runes/lightning
+- Gen script: /home/ubuntu/gen_boss_skills.py (magenta bg prompts, saved in /tmp/gen_skills/*.png)
+- Cut script: /home/ubuntu/process_skills2.py (mag metric, alpha ramp, fringe kill, bbox crop)
+- QA sheet: /home/ubuntu/skills_transparent_check2.png — looks great
+
+### Code hooks needed in js/boss.js (spawnAttack ~L847-904, spawnTargetedFireball ~L907-937):
+- fireball div (L848-860): was solid color circle 3vw; → use <img src="assets/skill_fireball.webp"> with filter drop-shadow(0 0 10px ${theme.fireball.color}), size ~5vw. Keep border-radius 0.
+- ice div (L867-881): 30vw circle, radial gradient → use skill_ice.webp img, bigger ~26vw.
+- portal div (L887-903): 8vw → skill_portal.webp img, ~12vw, keep portalSpin animation (rotate img).
+- targeted fireball (L920-936): #FF4444 circle → skill_fireball.webp img.
+- Also keep existing colored box-shadow glow (box-shadow: 0 0 15px color) for readability on light arena parts.
+
+### Remaining:
+1. Edit boss.js 4 spawn sites (fireball, ice, portal, targeted fireball) → img.
+2. bump index.html cache-bust ?v=11 → ?v=12.
+3. QA local (spawn attacks visible via img), then deploy:
+   cd /home/ubuntu/questverse-game && python3 make_vercel_payload.py (must be <4MB; check size) && manus-mcp-cli tool call deploy_to_vercel --server vercel --input-file vercel_deploy_input.json
+4. poll get_deployment with teamId team_M57w1DW5EdqJADbOQsFLkJPK; prod URL https://questverse-space-explorer.vercel.app
+5. git add -A && commit "Add boss skill FX art (fireball/ice/portal images)" && git push origin main
+6. report user with screenshots
+
+### Deployment refs
+- teamId=team_M57w1DW5EdqJADbOQsFLkJPK, projectId prj_sZAMieVaazfOEo1yEAxaaTjdBbgP
+- Local QA: python3 -m http.server 8777 at /home/ubuntu/questverse-game (pid may change)
+- GitHub: kapomtong/questverse-space-explorer main, last commit ae2f782 (joystick fix v11)
+- v11 was deployed as dpl_Ak93vnRodUQKjuxCBYw6cNpBEiTJ (joystick fix)
+
+## Round 4 QA RESULT (local, 14:03) — EXCELLENT
+Screenshot /home/ubuntu/screenshots/localhost_2026-08-19_14-03-32_8099.webp shows:
+- skill_fireball.webp (7vw): glowing fireball — renders beautifully, small trailing flames
+- skill_ice.webp (26vw): huge ice crystal zone with snowflakes — very visible, great
+- skill_portal.webp (14vw): purple spiral portal with runes/lightning — great
+- All 3 images loaded OK (fetch verified), transparent cuts clean, drop-shadow glows working.
+- Collisions scaled: fireball dist<5, ice dist<13, portal dist<7 (match new visual sizes).
+- Code done: boss.js spawnAttack + spawnTargetedFireball use img; style.css has icePulse keyframe + .attack-* img rules.
+- cache-bust bumped ?v=11 → ?v=12 (14 hits in index.html).
+
+### REMAINING: deploy + push + report
+Deploy cmd: cd /home/ubuntu/questverse-game && python3 make_vercel_payload.py && manus-mcp-cli tool call deploy_to_vercel --server vercel --input-file vercel_deploy_input.json
+Poll: sleep 60 && manus-mcp-cli tool call get_deployment --server vercel --input '{"idOrUrl":"dpl_XXX","teamId":"team_M57w1DW5EdqJADbOQsFLkJPK"}'
+Prod URL: https://questverse-space-explorer.vercel.app (verify curl HTML shows 14x ?v=12)
+Git: git add -A && commit "Add boss skill FX art: fireball/ice/portal images replace plain circles; scale hitboxes" && git push origin main
+Last commit: ae2f782. QA screenshots: localhost_2026-08-19_14-03-32_8099.webp
