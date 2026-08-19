@@ -213,3 +213,14 @@ Confirmed on https://questverse-space-explorer.vercel.app/?v=10:
 - NEXT: git push (deploy already READY dpl_C46pB7CNZ45Nc8hwbYGda3u6GvuW), then report to user with before/after.
 - GitHub commit pending: "Sprite animation + HD arenas + neon UI"
 - Cache-bust now ?v=10. Local server port 8777.
+
+## Round 3 — Joystick Fix (v11) QA local
+User screenshot showed red dot = targeted fireball (#FF4444, expected). "เดินไม่ได้" root causes fixed:
+1. `stick.style.transform` JS overwrite destroyed CSS centering translate(-50%,-50%). Fixed → `translate(calc(-50% + dxpx), calc(-50% + dypx))`.
+2. Joystick events bound only on `.j-base`; now on `#joystick` container + touchstart moves immediately.
+3. Mousemove/mouseup scoped, cleaned up on up.
+4. UI: 130px, green neon ring + crosshair, pulsing stick (jstickPulse).
+5. Cache-bust ?v=10 → ?v=11.
+
+QA local (force-show joystick): simulated touch → player moved left 50% → calc(88% - 48px). MOVEMENT WORKS. Screenshot: /home/ubuntu/screenshots/localhost_2026-08-19_08-23-44_3624.webp
+Next: deploy v11, push GitHub, report.

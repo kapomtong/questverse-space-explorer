@@ -342,6 +342,7 @@ class BossBattle {
     // Joystick
     const stick = this.joystickEl.querySelector('.j-stick');
     const base = this.joystickEl.querySelector('.j-base');
+    const handleZone = this.joystickEl; // รับทัชทั้งโซน joystick (นอกวงแหวนก็ด้วย)
     
     const handleStart = (clientX, clientY) => {
       this.gameState.joystick.active = true;
@@ -360,30 +361,40 @@ class BossBattle {
         dx = (dx / distance) * maxDist;
         dy = (dy / distance) * maxDist;
       }
-      stick.style.transform = `translate(${dx}px, ${dy}px)`;
+      stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
       this.gameState.joystick.dx = dx / maxDist;
       this.gameState.joystick.dy = dy / maxDist;
     };
     
     const handleEnd = () => {
       this.gameState.joystick.active = false;
-      stick.style.transform = 'translate(0, 0)';
+      stick.style.transform = 'translate(-50%, -50%)';
       this.gameState.joystick.dx = 0;
       this.gameState.joystick.dy = 0;
     };
 
-    base.addEventListener('touchstart', (e) => {
+    const onStart = (clientX, clientY) => {
+      handleStart(clientX, clientY);
+      handleMove(clientX, clientY); // เคลื่อนทันทีตั้งแต่แตะ
+    };
+    handleZone.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      handleStart(e.touches[0].clientX, e.touches[0].clientY);
-    });
-    base.addEventListener('touchmove', (e) => {
+      onStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+    handleZone.addEventListener('touchmove', (e) => {
       e.preventDefault();
       handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+    handleZone.addEventListener('touchend', (e) => { e.preventDefault(); handleEnd(); });
+    handleZone.addEventListener('touchcancel', (e) => { e.preventDefault(); handleEnd(); });
+    handleZone.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      onStart(e.clientX, e.clientY);
+      this._joyMoveFn = (ev) => handleMove(ev.clientX, ev.clientY);
+      this._joyUpFn = () => { handleEnd(); window.removeEventListener('mousemove', this._joyMoveFn); window.removeEventListener('mouseup', this._joyUpFn); };
+      window.addEventListener('mousemove', this._joyMoveFn);
+      window.addEventListener('mouseup', this._joyUpFn);
     });
-    base.addEventListener('touchend', handleEnd);
-    base.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
-    window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
-    window.addEventListener('mouseup', handleEnd);
   }
 
   loadQuestionPool() {

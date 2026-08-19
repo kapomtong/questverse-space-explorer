@@ -2622,35 +2622,54 @@ body {
 /* ===== Joystick (touch movement) + question bar ===== */
 #joystick {
   position: absolute;
-  bottom: 4%;
+  bottom: 5%;
   left: 4%;
-  width: 96px;
-  height: 96px;
+  width: 130px;
+  height: 130px;
   z-index: 50;
   display: none;
+  touch-action: none;
 }
 .j-base {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(74, 222, 128, 0.10) 0%, rgba(74, 222, 128, 0.02) 65%, transparent 72%);
-  border: 2px solid rgba(74, 222, 128, 0.55);
-  box-shadow: 0 0 18px rgba(74, 222, 128, 0.35), inset 0 0 14px rgba(74, 222, 128, 0.15);
+  background: radial-gradient(circle, rgba(74, 222, 128, 0.08) 0%, rgba(74, 222, 128, 0.03) 55%, rgba(74, 222, 128, 0.10) 78%, rgba(74, 222, 128, 0.02) 84%, transparent 100%);
+  border: 2px solid rgba(74, 222, 128, 0.85);
+  box-shadow: 0 0 22px rgba(74, 222, 128, 0.55), 0 0 55px rgba(74, 222, 128, 0.25), inset 0 0 18px rgba(74, 222, 128, 0.22), inset 0 0 45px rgba(74, 222, 128, 0.10);
   position: relative;
   touch-action: none;
 }
+.j-base::before, .j-base::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent 0%, rgba(74, 222, 128, 0.5) 40%, rgba(74, 222, 128, 0.9) 50%, rgba(74, 222, 128, 0.5) 60%, transparent 100%);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
+  pointer-events: none;
+}
+.j-base::before { top: 50%; }
+.j-base::after { left: 0; top: 50%; transform: none; width: 2px; height: 100%; background: linear-gradient(180deg, transparent 0%, rgba(74, 222, 128, 0.5) 40%, rgba(74, 222, 128, 0.9) 50%, rgba(74, 222, 128, 0.5) 60%, transparent 100%); }
 .j-stick {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 40%;
-  height: 40%;
+  width: 46%;
+  height: 46%;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #A7F3D0 0%, #22C55E 55%, #15803D 100%);
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 0 14px rgba(74, 222, 128, 0.8);
+  background: radial-gradient(circle at 35% 28%, #BBF7D0 0%, #4ADE80 45%, #16A34A 85%, #14532D 100%);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 18px rgba(74, 222, 128, 0.95), 0 0 35px rgba(74, 222, 128, 0.45), inset 0 -4px 8px rgba(0, 0, 0, 0.35);
   transform: translate(-50%, -50%);
   pointer-events: none;
+  animation: jstickPulse 2s ease-in-out infinite;
+}
+@keyframes jstickPulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(74, 222, 128, 0.95), 0 0 35px rgba(74, 222, 128, 0.45), inset 0 -4px 8px rgba(0, 0, 0, 0.35); }
+  50% { box-shadow: 0 0 26px rgba(74, 222, 128, 1), 0 0 55px rgba(74, 222, 128, 0.7), inset 0 -4px 8px rgba(0, 0, 0, 0.35); }
 }
 .boss-question-bar {
   position: absolute;
