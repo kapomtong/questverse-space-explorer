@@ -32,6 +32,72 @@ QV.app.screens['boss-hall'] = {
     return null;
   },
 
+
+  showSkillsModal() {
+    this.removeSkillsModal();
+    const container = document.getElementById('app');
+    const modal = document.createElement('div');
+    modal.id = 'boss-skills-modal';
+    modal.className = 'skills-modal';
+    modal.innerHTML = `
+      <div class="skills-overlay" data-action="close-skills"></div>
+      <div class="skills-panel">
+        <button class="skills-close" data-action="close-skills" aria-label="ปิด">✕</button>
+        <h3>📘 คู่มือสกิลการสู้บอส</h3>
+        <div class="skills-list">
+          <div class="skill-row">
+            <div class="skill-icon">🎯</div>
+            <div><b>คำตอบถูก = โจมตีบอส</b> — ตอบถูก 10 ข้อ = ชนะ! เดินเท้าไปยืนบนป้ายคำตอบ แล้วบอสจะโดนดาเมจ</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🛡️</div>
+            <div><b>โล่พิทักษ์</b> — กันดาเมจจากการโดนบอสโจมตีครั้งแรก 1 ครั้ง</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🧪</div>
+            <div><b>ยาฟื้นฟู</b> — ฟื้น HP 1 ดวง ทุก 3 คำตอบถูก</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">⚡</div>
+            <div><b>เวลาชะลอ</b> — บอสโจมตีช้าลง 40% ใน 10 วินาทีแรก</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🔥</div>
+            <div><b>คอมโบ</b> — ตอบถูกติดกันสะสมคอมโบ! คอมโบยิ่งสูงยิ่งต่อแต้ม และยิ่งคอมโบสูงบอสจะโกรธจัด เร่งความเร็ว</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🐾</div>
+            <div><b>เพ็ท Mito</b> — แมวคู่หูจะลอยตามเจ้าไปทุกที่ คอยให้กำลังใจตลอดเวลา</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🃏</div>
+            <div><b>อีเวนต์การ์ด</b> — ทุก 3 ข้อ อาจเกิด: ☄️ อุกกาบาต (ลูกบอมบ์ตก), 🌀 หลุมดำ (แรงดูดเข้าศูนย์กลาง), 🎁 ของขวัญ (บอสมอบไอเทมฟรี!)</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🧊</div>
+            <div><b>การโจมตีบอส</b> — พลุไฟ 💥 และน้ำแข็งเยือกแข็ง 🧊 (โดนแช่แข็ง = เคลื่อนที่ไม่ได้จนกว่าจะละลาย) เดินหลบไปให้ทัน!</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">🚶</div>
+            <div><b>ห้ามยืนแช่!</b> — ยืนที่เดิมนานเกิน 4.5 วิ จะโดนเตือนและบอสจะโจมตีรัว การเดินและตอบสลับตำแหน่งคือกุญแจสู่ชัยชนะ</div>
+          </div>
+          <div class="skill-row">
+            <div class="skill-icon">❄️</div>
+            <div><b>ใจเย็น ๆ</b> — บอสมี HP 3 ดวงเช่นเดียวกับเจ้า โดน 3 ครั้ง = แพ้ พิชิตบอสครบรับ Badge และ XP ปลดล็อกบอสถัดไป!</div>
+          </div>
+        </div>
+      </div>
+    `;
+    container.appendChild(modal);
+    modal.querySelectorAll('[data-action="close-skills"]').forEach(b => {
+      b.addEventListener('click', () => this.removeSkillsModal());
+    });
+  },
+  removeSkillsModal() {
+    const m = document.getElementById('boss-skills-modal');
+    if (m) m.remove();
+  },
+
   mount(params) {
     this.attachEventListeners();
   },
@@ -88,6 +154,7 @@ QV.app.screens['boss-hall'] = {
           <div class="hall-actions">
             <button class="btn-leaderboard">🏆 กระดานผู้นำ</button>
             <button class="btn-time-attack">⏱️ Time Attack</button>
+            <button class="btn-skills" data-action="skills">📘 สกิลการสู้</button>
             <button class="btn-back-map">🗺️ แผนที่เดิม</button>
           </div>
         </header>
@@ -164,6 +231,10 @@ QV.app.screens['boss-hall'] = {
     }
 
     const timeAttackBtn = container.querySelector('.btn-time-attack');
+    // ปุ่มสกิลการสู้
+    const btnSkills = container.querySelector('.btn-skills');
+    if (btnSkills) btnSkills.addEventListener('click', () => this.showSkillsModal());
+
     if (timeAttackBtn) {
       timeAttackBtn.addEventListener('click', () => QV.app.show('time-attack'));
     }

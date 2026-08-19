@@ -108,16 +108,17 @@ const BOSS_CONFIGS = {
 
 const CONFIG = {
   PAD_SLOTS: [
-    { left: 15, top: 20 },
-    { left: 75, top: 25 },
-    { left: 10, top: 60 },
-    { left: 85, top: 65 },
-    { left: 40, top: 15 },
-    { left: 60, top: 75 },
-    { left: 25, top: 80 },
-    { left: 70, top: 45 }
+    { left: 12, top: 55 },
+    { left: 88, top: 55 },
+    { left: 20, top: 72 },
+    { left: 80, top: 72 },
+    { left: 15, top: 88 },
+    { left: 85, top: 88 },
+    { left: 35, top: 85 },
+    { left: 65, top: 85 }
   ],
-  PAD_MIN_DISTANCE: 18,
+  PAD_MIN_TOP: 40,
+  PAD_MIN_DISTANCE: 22,
   PLAYER_SPEED: 0.4,
   INTENTIONAL_THRESHOLD: 0.15,
   INTENTIONAL_DURATION: 800,
@@ -277,11 +278,16 @@ class BossBattle {
       <p>${this.config.introCutIn}</p>
     `;
     this.arenaEl.appendChild(cutIn);
+    // ซ่อนบอสขณะ intro ไม่ให้โผล่ซ้อน intro overlay
+    const introBoss = this.arenaEl.querySelector(".boss-roam");
+    if (introBoss) introBoss.style.visibility = "hidden";
 
     setTimeout(() => {
       cutIn.style.opacity = '0';
       setTimeout(() => {
         cutIn.remove();
+        const postBoss = this.arenaEl.querySelector(".boss-roam");
+        if (postBoss) postBoss.style.visibility = "visible";
         this.startBattle();
       }, 500);
     }, 3000);
@@ -396,7 +402,7 @@ class BossBattle {
     this.gameState.currentQuestion = q;
     const qText = this.arenaEl.querySelector('#boss-q-text');
     if (qText) qText.innerHTML = typeof QV.formatFrac === 'function' ? QV.formatFrac(QV.escapeHtml(q.q)) : QV.escapeHtml(q.q);
-
+    
     // Select 4 pad slots
     const slots = this.selectPadSlots();
     this.gameState.pads = q.choices.map((choice, i) => {
@@ -418,8 +424,9 @@ class BossBattle {
     }
   }
 
+  
   selectPadSlots() {
-    const available = [...CONFIG.PAD_SLOTS];
+    const available = [...CONFIG.PAD_SLOTS].filter(s => s.top >= CONFIG.PAD_MIN_TOP);
     const selected = [];
     
     for (let i = 0; i < 4; i++) {
@@ -587,7 +594,8 @@ class BossBattle {
       const dy = py - pad.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 6) {
+      const effDist = dist;
+      if (effDist < 6) {
         padEl.style.transform = 'translate(-50%, -50%) scale(1.1)';
         padEl.style.borderColor = 'rgba(255, 255, 255, 0.8)';
 
