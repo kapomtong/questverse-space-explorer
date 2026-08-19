@@ -5,7 +5,7 @@ const BOSS_CONFIGS = {
     subject: 'math',
     difficulty: 1,
     requiredXP: 0,
-    arenaBg: 'assets/arena_mathos.webp',
+    arenaBg: 'assets/arena_mathos_hd.webp',
     bossImg: 'assets/boss_mathos.webp',
     introCutIn: 'จงพิสูจน์ความสามารถทางคณิตศาสตร์ของเจ้า!',
     victoryMsg: 'เจ้าเข้าใจหลักการคณิตศาสตร์อย่างแท้จริง',
@@ -26,7 +26,7 @@ const BOSS_CONFIGS = {
     subject: 'science',
     difficulty: 2,
     requiredXP: 100,
-    arenaBg: 'assets/arena_chronos.webp',
+    arenaBg: 'assets/arena_chronos_hd.webp',
     bossImg: 'assets/boss_chronos.webp',
     introCutIn: 'เวลาและวิทยาศาสตร์คือกฎของข้า!',
     victoryMsg: 'เจ้าควบคุมเวลาและวิทยาศาสตร์ได้แล้ว',
@@ -234,6 +234,15 @@ class BossBattle {
     player.innerHTML = `<img src="assets/suit_${suit}.webp" alt="นักผจญภัย" onerror="this.style.display='none'">`;
     arena.appendChild(player);
     this.playerEl = player;
+    // Sprite animation: preload walk/idle/attack frames (fallback keeps the suit img)
+    this.playerSprite = { frames: { walk: [], idle: [], attack: [] }, atkTimer: null, lastSwap: 0 };
+    ['walk', 'idle', 'attack'].forEach(anim => {
+      for (let i = 0; i < 4; i++) {
+        const img = new Image();
+        img.src = `assets/player_${anim}_${i}.webp`;
+        img.onload = () => { if (img.naturalWidth > 50) this.playerSprite.frames[anim][i] = img; };
+      }
+    });
 
     // Pet Mito
     const pet = document.createElement('div');
@@ -474,15 +483,16 @@ class BossBattle {
         left: ${pad.x}%;
         top: ${pad.y}%;
         transform: translate(-50%, -50%);
-        width: 12vw;
-        height: 12vw;
-        background: rgba(255, 255, 255, 0.1);
-        border: 2px solid rgba(255, 255, 255, 0.3);
+        width: 13vw;
+        height: 13vw;
+        background: radial-gradient(circle, rgba(56, 189, 248, 0.18) 0%, rgba(56, 189, 248, 0.05) 55%, transparent 72%);
+        border: 2.5px solid rgba(125, 249, 255, 0.75);
         border-radius: 999px;
+        box-shadow: 0 0 18px rgba(125, 249, 255, 0.4), inset 0 0 14px rgba(125, 249, 255, 0.15);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+        font-size: clamp(0.95rem, 1.7vw, 1.3rem);
         color: white;
         text-align: center;
         padding: 1vw;
@@ -494,13 +504,18 @@ class BossBattle {
       core.className = 'pad-core';
       core.textContent = pad.text;
       core.style.cssText = `
-        width: 70%;
-        height: 70%;
-        background: rgba(255, 255, 255, 0.2);
+        width: 62%;
+        height: 62%;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1.5px solid rgba(125, 249, 255, 0.55);
         border-radius: 999px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-weight: 800;
+        text-shadow: 0 0 10px rgba(125, 249, 255, 0.9);
+        backdrop-filter: blur(3px);
+        letter-spacing: 0.5px;
       `;
       el.appendChild(core);
       
@@ -558,6 +573,8 @@ class BossBattle {
     } else if (this.gameState.player.vx > 0.001) {
       this.playerEl.style.transform = 'scaleX(1)';
     }
+    // Sprite animation: walk / idle / attack frames
+    this.updatePlayerSprite(dt);
 
     // Shield visual
     if (this.gameState.player.shielded) {
@@ -669,6 +686,7 @@ class BossBattle {
 
       // บอสสะเทือนถูกทำร้าย
       this.bossHurt();
+      this.playerAttack(); // ตัวละครทำท่าตีบอสจริง
       this.loadQuestion();
     } else {
       this.gameState.combo = 0;
@@ -1063,6 +1081,43 @@ class BossBattle {
     this.bossAtkTimer = setTimeout(() => {
       if (this.bossSpriteEl) this.bossSpriteEl.classList.remove('attacking');
     }, 460);
+  }
+  // อนิเมชันตีของผู้เล่น: เล่น sprite attack ตามเฟรม
+  playerAttack() {
+    const fs = this.playerSprite.frames.attack.filter(Boolean);
+    const imgEl = this.playerEl.querySelector('img');
+    if (!fs.length || !imgEl) return;
+    let f = 0;
+    const total = fs.length * 2;
+    const tick = () => {
+      const frame = fs[f % fs.length];
+      if (frame) {
+        imgEl.src = frame.src;
+        imgEl.style.objectFit = 'contain';
+      }
+      f++;
+      if (f < total) {
+        this.playerSprite.atkTimer = setTimeout(tick, 90);
+      } else {
+        this.playerSprite.atkTimer = null;
+      }
+    };
+    if (this.playerSprite.atkTimer) clearTimeout(this.playerSprite.atkTimer);
+    tick();
+  }
+  updatePlayerSprite(dt) {
+    if (this.playerSprite.atkTimer) return;
+    const imgEl = this.playerEl.querySelector('img');
+    if (!imgEl) return;
+    const moving = Math.abs(this.gameState.player.vx) > 0.001 || Math.abs(this.gameState.player.vy) > 0.001;
+    const interval = moving ? 130 : 700;
+    if (performance.now() - this.playerSprite.lastSwap < interval) return;
+    this.playerSprite.lastSwap = performance.now();
+    const frames = (moving ? this.playerSprite.frames.walk : this.playerSprite.frames.idle).filter(Boolean);
+    if (!frames.length) return;
+    const idx = moving ? Math.floor(performance.now() / 130) % frames.length : Math.floor(performance.now() / 700) % Math.max(1, frames.length);
+    imgEl.src = frames[idx].src;
+    imgEl.style.objectFit = 'contain';
   }
   // กระตุ้นให้บอสสะเทือนเมื่อผู้เล่นตอบถูก
   bossHurt() {

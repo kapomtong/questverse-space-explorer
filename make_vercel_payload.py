@@ -5,13 +5,28 @@ import json, base64, os
 ROOT = '/home/ubuntu/questverse-game'
 SKIP = {'call_claude.py', 'qa_all.js', 'qa_questions.js', 'repro.js', 'fix_app.js',
         'build_questions.py', 'module4.md', 'module4b.md', 'module4c.md',
-        'module5.md', 'module6.md', 'vercel_deploy_input.json'}
+        'module5.md', 'module6.md', 'vercel_deploy_input.json',
+        'inspect_payload.py', 'inspect_payload2.py', 'optimize_assets2.py',
+        'optimize_payload_imgs.py', 'make_arena_hd.py',
+        'boss_lex.png', 'boss_kawi.png', 'boss_terra.png',
+        'item_shield_new.png', 'item_potion.png', 'item_boost.png',
+        'event_asteroid.png', 'event_blackhole.png', 'pet_mito.png',
+        'event_gift.png', 'arena_kawi.jpg', 'arena_lex.jpg',
+        'arena_terra.jpg', 'boss_arena.jpg', 'test_img_api.png',
+        'remove_magenta.py', 'patch_boss_fixes.py', 'patch_sprites.py',
+        'patch_boss_anim.py', 'patch_boss_anim2.py', 'patch_boss_anim3.py',
+        'patch_overlap_skills.py', 'patch_hall_skills.py', 'fix_hall_comma.py',
+        'patch_landing_guide.py', 'patch_skills_css.sh', 'patch_hall_comma.py',
+        'shrink_payload.py'}
+SKIP_DIR = {'prompts', 'responses', 'opus_out_v2', 'opus_out_v3', 'opus_out_v4', 'opus_out_v5', '__pycache__', 'screenshots'}
 EXT_BINARY = {'.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif', '.ico', '.mp3', '.wav'}
 
 files = []
 for dirpath, _, fnames in os.walk(ROOT):
     rel_dir = os.path.relpath(dirpath, ROOT)
     if '/.git' in ('/' + rel_dir) or rel_dir.startswith('.git'):
+        continue
+    if rel_dir in SKIP_DIR or rel_dir.split('/')[0] in SKIP_DIR:
         continue
     for fn in fnames:
         if fn in SKIP or fn.startswith('.'):
