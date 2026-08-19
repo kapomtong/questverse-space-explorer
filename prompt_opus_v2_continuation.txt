@@ -1,0 +1,43 @@
+งานรอบ 2 (ต่อเนื่องจากรอบแรก — คุณเขียน boss.js ไปถึง showVictory แล้ว แต่ตอบไม่ครบ โค้ด boss.js รอบแรกจึงใช้ไม่ได้ ให้เขียน boss.js ใหม่ให้ครบทั้งหมดในข้อความนี้ด้วย)
+
+API นี้ไม่มีเครื่องมือใดๆ ห้ามใช้ tool เด็ดขาด จงเขียนโค้ดให้ครบทุกไฟล์โดยอิงข้อมูลใน prompt นี้โดยตรง (ห้ามขอให้ส่งโค้ดเดิมมา — ผมบอกไว้หมดแล้ว) ข้อความตอบกลับต้องเป็น Markdown code blocks (```javascript / ```css) ครบทุกส่วน
+
+## โครงสร้าง boss.js v1 ที่คุณออกแบบ (ใช้ pattern นี้)
+- BOSS_CONFIGS = { mathos, chronos, kawi, lex, terra } — แต่ละตัวมี: id, name, subject, difficulty, requiredXP, arenaBg, bossImg, introCutIn, victoryMsg, defeatMsg, attackTheme {fireball:{color,name}, ice:{color,name}, portal:{color,name}}, baseDifficulty {attackInterval, firstAttackDelay}
+- class BossBattle ที่รับ (root, bossId) ทำ mount/cleanup
+- ระบบเดิมที่ทำงานอยู่แล้วและต้องคงไว้:
+  * PLAYER ความเร็ว, player position (gameState.player), WASD keydown/keyup + Touch joystick (DOM #joystick, .j-base, .j-stick)
+  * Spread answer pads: CONFIG.PAD_SLOTS = 8 ตำแหน่ง (% left/top), ทุกข้อสุ่ม 4 slots, ระยะห่างขั้นต่ำ PAD_MIN_DISTANCE 18 vw, pad = .answer-pad มี core วงใน, CSS transition
+  * Intentional answer: ต้องหยุดนิ่ง (speed < 0.15 normalized) + ยืนบน core ป้าย 0.8s ถึงตอบ — ห้ามตอบขณะวิ่งชน
+  * Anti-camping: ยืนแช่ 4.5s → แสดง .camping-warning (DOM element มีอยู่แล้ว) + targeted fireball ยิงใส่ตำแหน่งผู้เล่น
+  * Attacks: fireball (บินตรง), ice (freeze zone), portal (วาร์ป) — ใช้ attackTheme.color ของบอสแต่ละตัว
+  * โหลดคำถามจาก QV.questions[subject].questions — โครงสร้าง {q, choices:[4 items], answerIdx, xp} — ห้ามสร้างคำถามเอง
+  * HP player = 3 ดวง (พลังงาน QV.state.energy อาจใช้), โดนโจมตี -1, หมด = defeat
+  * ชนะข้อ = +xp, โหมด combo (ตอบถูกติด 3 = Comet Dash เร็ว+30% +เรืองแสง, ตอบถูก 10 ไม่ตาย = bonus xp + confetti), combo counter บน HUD
+  * Event cards ทุก 3 ข้อ: สุ่ม 1 ใน 3 — asteroid (หินตก 5 ลูก), blackhole (ป้ายดูดหากัน 6 วิ), gift (+HP 1) — ภาพ assets/event_asteroid.webp, event_blackhole.webp, event_gift.webp
+  * Item: item_selected (shield/potion/boost) — shield กัน hit แรก, potion +HP ทุก 3 ข้อถูก, boost ช้าลง 40% ใน 10 วิแรก — ภาพ assets/item_shield.webp, item_potion.webp, item_boost.webp
+  * Pet Mito (assets/pet_mito.webp) ลอยตาม player ตลอด game loop + bob animation
+  * Intro cut-in 3 วิ ก่อนเริ่ม: bossImg + introCutIn
+  * Victory/Defeat screen: victoryMsg/defeatMsg ของบอส + ปุ่มกลับไป hall
+
+## ไฟล์ที่ต้องเขียน (ครบทุกไฟล์ ครั้งเดียว)
+1. js/boss.js — engine ครบทุกส่วน (ต่อจาก v1 ให้จบ: movement, attacks, ice, portal, checkPadCollision, onAnswer, loadQuestion, selectPadSlots, updateCampingDetection, updateEvent, items, combo, pet, gameLoop, mount, cleanup, showVictory, showDefeat)
+2. js/bossHall.js — หน้า Boss Hall: สร้างการ์ดบอส 5 ใบ (loop BOSS_CONFIGS), แสดง XP/ยศ/เลเวลจาก QV.state, ล็อกบอสตาม requiredXP (Mathos 0, Chronos 100, Kawi 250, Lex 450, Terra 700), หน้าเลือกไอเทม (radio 3 ชิ้น + ปุ่มเริ่ม → mount boss), ปุ่มกระดานผู้นำ, ปุ่ม Time Attack
+3. js/timeAttack.js — โหมด Time Attack: ตอบ 10 ข้อใน 90 วิ (+5 วิทุกคำตอบถูก), XP โบนัสตามเวลาที่เหลือ, ใช้ BossBattle engine ร่วม (mount ด้วย)
+4. ส่วน app.js ที่ต้องแก้: root route → 'boss-hall'; route 'boss' → boss mount ด้วย bossId; route 'time-attack'
+5. CSS เพิ่มใน style.css: .boss-hall, .boss-card, .boss-card.locked, .item-select, .event-card, .combo-counter, .intro-cutin, .pet-mito
+
+## ข้อมูล assets
+บอส+สนาม: mathos=assets/boss_mathos.webp+assets/arena_mathos.webp, chronos=assets/boss_chronos.webp+assets/arena_chronos.webp, kawi=assets/boss_kawi.webp+assets/arena_kawi.webp, lex=assets/boss_lex.webp+assets/arena_lex.webp, terra=assets/boss_terra.webp+assets/arena_terra.webp
+
+## Convention เดิม
+- DOM: #app container, class .screen; HUD เดิม .hud, .hp-display, .hud-xp; ปุ่ม .btn .btn-gold
+- register screen: QV.app.screens['boss-hall'] = { mount(root, params){...}, cleanup(){...} };
+- QV.loadState()/saveState(); QV.refreshEnergy; QV.state มี {player:{name,xp,level,energy,...}, badges:[], ...}
+- Badge ใหม่เมื่อบอสชนะ: 'boss-mathos', 'boss-chronos', 'boss-kawi', 'boss-lex', 'boss-terra'
+- ภาษาไทยทั้งหมด
+
+เขียนให้ครบ จบโดยไม่ต้องแบ่งรอบอีก — เริ่มจาก boss.js ก่อน
+
+
+สำคัญมาก: API นี้ไม่มีเครื่องมือใดๆ ให้ใช้ — ห้ามพยายามใช้ tool เด็ดขาด ห้ามอ้างว่าต้อง "อ่านไฟล์" ก่อน จงเขียนโค้ดให้ครบทุกไฟล์โดยไม่ต้องแบ่งรอบ ข้อความตอบกลับต้องเป็น Markdown code blocks (```javascript / ```css) ครบทุกไฟล์

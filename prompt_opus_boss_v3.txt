@@ -1,0 +1,1176 @@
+คุณคือ Programmer ผู้เชี่ยวชาญ (GPT sol5.6 / Opus 5) งานของคุณคือตรวจและปรับปรุงไฟล์ js/boss.js ในส่วนของระบบ Boss Battle ของเกม QuestVerse
+
+โจทย์ปัจจุบัน:
+1. ผู้เล่นบ่นว่า "เดินชนป้ายแล้วตอบเอง" (แก้แล้วโดยการเพิ่มระบบ intentional answer: ต้องหยุดยืนบน core ป้าย 0.8 วิ)
+2. ผู้เล่นต้องการให้ "ป้ายคำตอบกระจายกัน" และ "มีระบบกันคนยืนแช่ตอบข้อเดิมตลอด"
+
+สิ่งที่ Manus (AI Project Manager) ทำไปแล้ว:
+- เพิ่ม CONFIG.PAD_SLOTS (8 ตำแหน่งกระจายรอบสนาม)
+- ใน loadQuestion() สุ่มเลือก 4 slots จาก 8 และอัปเดตตำแหน่งป้าย (pad.style.left/top)
+- เพิ่ม CSS transition ให้ป้ายเลื่อนตำแหน่งได้ลื่นไหล
+
+สิ่งที่คุณต้องทำ:
+1. ตรวจสอบโค้ดใน js/boss.js (ที่แนบมา) โดยเฉพาะส่วน loadQuestion, checkPadCollision และ CONFIG
+2. ปรับปรุงให้ "มัน" ขึ้น: 
+   - เช่น ตรวจสอบว่าป้ายที่สุ่มมาไม่บังกันเอง (ซึ่ง 8 slots ที่เตรียมไว้ค่อนข้างห่างกันแล้ว แต่อาจมี logic ดีกว่านี้)
+   - ตรวจสอบว่าระบบ intentional answer (isStandingStill) ยังทำงานได้ดีเมื่อป้ายเคลื่อนที่
+   - เพิ่ม "ความท้าทาย" เช่น ถ้าผู้เล่นยืนแช่ที่เดิมนานเกินไป (แม้ไม่ใช่ป้าย) บอสอาจยิงท่าโจมตีใส่ตำแหน่งนั้นทันที? (Optional)
+3. ส่งโค้ด js/boss.js ฉบับสมบูรณ์ที่รวมการปรับปรุงเหล่านี้กลับมา
+
+ไฟล์ js/boss.js ปัจจุบัน:
+(แทรกเนื้อหาไฟล์ที่อ่านมา)
+
+-----
+CONTENT OF js/boss.js (current):
+-----
+// ===== BOSS BATTLE SYSTEM =====
+// Screen: boss battle - ผู้เล่นเดินหลบท่าโจมตี และยืนบนป้ายคำตอบ
+
+(function() {
+  'use strict';
+
+  // ===== CONFIG =====
+  const CONFIG = {
+    // Movement
+    PLAYER_SPEED: 24, // % of arena width per second (ลดลงให้เด็กควบคุมได้
+    ARENA_BOUNDS: { minX: 2, maxX: 94, minY: 2, maxY: 94 }, // % of viewport
+    
+    // Collision
+    PLAYER_RADIUS: 2.2, // vw (ชนจริง ≈ 20px)
+    PAD_RADIUS: 4.5, // vw (ป้ายคำตอบ — ขนาดจริงของป้าย)
+    PAD_ANSWER_CORE: 2.2, // vw — แกนกลางป้ายที่นับว่า "ตั้งใจยืนตอบ" (ไม่ตอบเองทั้งที่เดินผ่าน)
+    ATTACK_RADIUS: 2.5, // vw
+    
+    // Timing
+    FIRST_ATTACK_DELAY: 6000, // ms — ให้เวลา 6 วิแรกก่อนบอสโจมตีครั้งแรก
+    QUESTION_TIME: 30, // วินาที
+    ANSWER_HOLD_TIME: 800, // ms ที่ต้องยืนบนป้าย (ป้องกันตอบเองทั้งที่เดินผ่าน)
+    MOVING_THRESHOLD: 3, // %/s — ต่ำกว่านี้นับว่า "หยุดยืน" (ตั้งใจตอบ)
+    ATTACK_INTERVAL_MIN: 5000, // ms (เริ่มช้า ให้เวลาคิด)
+    ATTACK_INTERVAL_MAX: 8000,
+    
+    // Damage
+    BOSS_HP: 10,
+    ATTACK_DAMAGE: 1,
+    CORRECT_XP: 15,
+    DODGE_XP: 5,
+    WIN_XP: 200,
+    LOSE_XP: 30,
+    
+    // Answer pads slots — 8 ตำแหน่งกระจายรอบสนาม (สุ่ม 4 จุดทุกข้อ)
+    PAD_SLOTS: [
+      { x: 15, y: 40 }, // ซ้ายบน
+      { x: 40, y: 30 }, // กลางบน
+      { x: 70, y: 30 }, // ขวาบน
+      { x: 85, y: 45 }, // ขวากลาง
+      { x: 15, y: 70 }, // ซ้ายล่าง
+      { x: 40, y: 80 }, // กลางล่าง
+      { x: 70, y: 80 }, // ขวาล่าง
+      { x: 85, y: 65 }  // ขวากลางล่าง
+    ],
+    PADS: [] // จะถูกสุ่มใน runtime
+  };
+
+  const BOSS_DATA = {
+    mathos: {
+      name: 'Mathos the Calculator',
+      image: 'assets/boss_mathos.webp',
+      badgeId: 'boss-mathos',
+      x: 12, y: 15
+    },
+    chronos: {
+      name: 'Chronos the Timekeeper',
+      image: 'assets/boss_chronos.webp',
+      badgeId: 'boss-chronos',
+      x: 12, y: 15
+    }
+  };
+
+  const ATTACK_TYPES = ['fireball', 'ice', 'portal'];
+
+  // ===== STATE =====
+  let gameState = {
+    boss: null,
+    bossHp: CONFIG.BOSS_HP,
+    questions: [],
+    currentQIdx: 0,
+    timer: CONFIG.QUESTION_TIME,
+    combo: 0,
+    
+    player: { x: 40, y: 80, vx: 0, vy: 0, facingLeft: false, frozen: false },
+    
+    attacks: [], // { type, x, y, vx, vy, startTime, warned }
+    
+    padHoldStart: null,
+    padHoldIdx: null,
+    padPositions: [], // เก็บพิกัด x,y ปัจจุบันของป้าย 0-3
+    
+    phase: 'question', // question | answer | win | lose
+    
+    // Input
+    keys: {},
+    joystick: { active: false, startX: 0, startY: 0, deltaX: 0, deltaY: 0 }
+  };
+
+  let rafId = null;
+  let attackTimer = null;
+  let timerInterval = null;
+  let lastFrameTime = 0;
+  let firstAttack = true;
+
+  // ===== DOM ELEMENTS =====
+  let container = null;
+  let bossSprite = null;
+  let playerSprite = null;
+  let answerPads = [];
+  let hudElements = {};
+
+  // ===== HELPER FUNCTIONS =====
+  function vwToPx(vw) {
+    return (vw / 100) * window.innerWidth;
+  }
+
+  function vhToPx(vh) {
+    return (vh / 100) * window.innerHeight;
+  }
+
+  function pxToVw(px) {
+    return (px / window.innerWidth) * 100;
+  }
+
+  function pxToVh(px) {
+    return (px / window.innerHeight) * 100;
+  }
+
+  function distance(x1, y1, x2, y2) {
+    // x/y เป็น % ของ viewport → แปลงเป็น vw ก่อน (ระยะทางยุคลิดในหน่วย vw)
+    const dxPx = (x2 - x1) / 100 * window.innerWidth;
+    const dyPx = (y2 - y1) / 100 * window.innerHeight;
+    const distPx = Math.sqrt(dxPx * dxPx + dyPx * dyPx);
+    return (distPx / window.innerWidth) * 100; // หน่วย vw
+  }
+
+  function collide(x1, y1, r1, x2, y2, r2) {
+    const dist = distance(x1, y1, x2, y2);
+    return dist < (r1 + r2);
+  }
+
+  // Random question selector
+  function getRandomQuestions(count) {
+    const allQuestions = [];
+    const planets = ['numberon', 'bionia', 'aksara', 'lingua', 'civilis'];
+    
+    planets.forEach(planetId => {
+      if (QV.QUESTIONS[planetId]) {
+        Object.values(QV.QUESTIONS[planetId]).forEach(zone => {
+          zone.forEach(q => {
+            allQuestions.push(q);
+          });
+        });
+      }
+    });
+
+    // Shuffle and pick (Fisher-Yates)
+    const shuffled = shuffleArray(allQuestions);
+    return shuffled.slice(0, count);
+  }
+
+  function shuffleArray(arr) {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+
+  // ===== DOM CREATION =====
+  function createDOM(bossId) {
+    const boss = BOSS_DATA[bossId];
+    
+    container = document.createElement('div');
+    container.id = 'screen-boss';
+    container.className = 'screen-boss';
+    container.innerHTML = `
+      <div class="boss-arena">
+        <!-- Boss -->
+        <div class="boss-sprite" id="boss-sprite">
+          <img src="${boss.image}" alt="${boss.name}">
+        </div>
+        
+        <!-- Player -->
+        <div class="player-sprite" id="player-sprite">
+          <img src="assets/suit_${QV.state.player.suit}.webp" alt="Player">
+        </div>
+        
+        <!-- Answer Pads -->
+        <div id="answer-pads"></div>
+        
+        <!-- Attack Tiles Container -->
+        <div id="attack-tiles"></div>
+        
+        <!-- HUD -->
+        <div class="hud-boss">
+          <div class="hud-top-left">
+            <div id="player-hearts"></div>
+            <div id="player-xp-bar"></div>
+          </div>
+          
+          <div class="hud-top-center">
+            <div id="question-counter"></div>
+            <div id="question-text"></div>
+            <div id="timer-bar"></div>
+          </div>
+          
+          <div class="hud-top-right">
+            <div class="boss-hp-label">${boss.name}</div>
+            <div id="boss-hp-bar"></div>
+          </div>
+        </div>
+        
+        <!-- Joystick (mobile) -->
+        <div id="joystick-container" class="joystick-container">
+          <div class="joystick-outer">
+            <div class="joystick-inner" id="joystick-inner"></div>
+          </div>
+        </div>
+        
+        <!-- Hint overlay -->
+        <div id="hint-overlay" class="hint-overlay"></div>
+        
+        <!-- End screen -->
+        <div id="end-screen" class="end-screen"></div>
+      </div>
+    `;
+
+    // Position boss
+    bossSprite = container.querySelector('#boss-sprite');
+    bossSprite.style.left = boss.x + '%';
+    bossSprite.style.top = boss.y + '%';
+
+    // Position player
+    playerSprite = container.querySelector('#player-sprite');
+    updatePlayerPosition();
+
+    // Create answer pads (สร้างรอไว้ 4 อัน ตำแหน่งจริงจะสุ่มใน loadQuestion)
+    const padsContainer = container.querySelector('#answer-pads');
+    for (let i = 0; i < 4; i++) {
+      const pad = document.createElement('div');
+      pad.className = 'answer-pad';
+      pad.style.left = '50%';
+      pad.style.top = '50%';
+      pad.style.opacity = '0'; // ซ่อนไว้ก่อน loadQuestion
+      pad.innerHTML = '<div class="pad-content"></div>';
+      padsContainer.appendChild(pad);
+      answerPads.push(pad);
+    }
+
+    // HUD elements
+    hudElements = {
+      hearts: container.querySelector('#player-hearts'),
+      xpBar: container.querySelector('#player-xp-bar'),
+      questionCounter: container.querySelector('#question-counter'),
+      questionText: container.querySelector('#question-text'),
+      timerBar: container.querySelector('#timer-bar'),
+      bossHpBar: container.querySelector('#boss-hp-bar'),
+      hintOverlay: container.querySelector('#hint-overlay'),
+      endScreen: container.querySelector('#end-screen'),
+      attackTiles: container.querySelector('#attack-tiles')
+    };
+
+    return container;
+  }
+
+  function updatePlayerPosition() {
+    if (!playerSprite) return;
+    playerSprite.style.left = gameState.player.x + '%';
+    playerSprite.style.top = gameState.player.y + '%';
+    
+    if (gameState.player.facingLeft) {
+      playerSprite.style.transform = 'scaleX(-1)';
+    } else {
+      playerSprite.style.transform = 'scaleX(1)';
+    }
+  }
+
+  // ===== MOVEMENT =====
+  function handleKeyDown(e) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'].includes(e.key)) {
+      e.preventDefault();
+    }
+    gameState.keys[e.key.toLowerCase()] = true;
+  }
+
+  function handleKeyUp(e) {
+    gameState.keys[e.key.toLowerCase()] = false;
+  }
+
+  function setupJoystick() {
+    const joystickContainer = container.querySelector('#joystick-container');
+    const joystickInner = container.querySelector('#joystick-inner');
+    
+    if (!joystickContainer) return;
+
+    // Show joystick on touch devices
+    if ('ontouchstart' in window) {
+      joystickContainer.style.display = 'block';
+    }
+
+    joystickContainer.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = joystickContainer.getBoundingClientRect();
+      gameState.joystick.active = true;
+      gameState.joystick.startX = touch.clientX - rect.left;
+      gameState.joystick.startY = touch.clientY - rect.top;
+    });
+
+    joystickContainer.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!gameState.joystick.active) return;
+      
+      const touch = e.touches[0];
+      const rect = joystickContainer.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      let deltaX = touch.clientX - rect.left - centerX;
+      let deltaY = touch.clientY - rect.top - centerY;
+      
+      const maxDist = 35; // pixels from center
+      const dist = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+      if (dist > maxDist) {
+        deltaX = (deltaX / dist) * maxDist;
+        deltaY = (deltaY / dist) * maxDist;
+      }
+      
+      gameState.joystick.deltaX = deltaX / maxDist; // normalize -1 to 1
+      gameState.joystick.deltaY = deltaY / maxDist;
+      
+      // Move inner joystick
+      joystickInner.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+    });
+
+    joystickContainer.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      gameState.joystick.active = false;
+      gameState.joystick.deltaX = 0;
+      gameState.joystick.deltaY = 0;
+      joystickInner.style.transform = 'translate(0, 0)';
+    });
+  }
+
+  function updatePlayerMovement(deltaTime) {
+    if (gameState.player.frozen || gameState.phase !== 'question') return;
+
+    let vx = 0;
+    let vy = 0;
+
+    // Keyboard input
+    if (gameState.keys['arrowleft'] || gameState.keys['a']) vx -= 1;
+    if (gameState.keys['arrowright'] || gameState.keys['d']) vx += 1;
+    if (gameState.keys['arrowup'] || gameState.keys['w']) vy -= 1;
+    if (gameState.keys['arrowdown'] || gameState.keys['s']) vy += 1;
+
+    // Joystick input
+    if (gameState.joystick.active) {
+      vx = gameState.joystick.deltaX;
+      vy = gameState.joystick.deltaY;
+    }
+
+    // Normalize diagonal movement
+    if (vx !== 0 && vy !== 0) {
+      const mag = Math.sqrt(vx ** 2 + vy ** 2);
+      vx /= mag;
+      vy /= mag;
+    }
+
+    // Update velocity
+    gameState.player.vx = vx;
+    gameState.player.vy = vy;
+
+    // Apply movement
+    if (vx !== 0 || vy !== 0) {
+      const speed = CONFIG.PLAYER_SPEED * deltaTime; // % of arena per second × dt
+      gameState.player.x += vx * speed;
+      gameState.player.y += vy * speed;
+
+      // Clamp to bounds
+      gameState.player.x = Math.max(CONFIG.ARENA_BOUNDS.minX, Math.min(CONFIG.ARENA_BOUNDS.maxX, gameState.player.x));
+      gameState.player.y = Math.max(CONFIG.ARENA_BOUNDS.minY, Math.min(CONFIG.ARENA_BOUNDS.maxY, gameState.player.y));
+
+      // Update facing direction
+      if (vx < 0) gameState.player.facingLeft = true;
+      if (vx > 0) gameState.player.facingLeft = false;
+
+      // Add walking animation class
+      if (!playerSprite.classList.contains('walking')) {
+        playerSprite.classList.add('walking');
+      }
+    } else {
+      playerSprite.classList.remove('walking');
+    }
+
+    updatePlayerPosition();
+  }
+
+  // ===== ATTACKS =====
+  function scheduleNextAttack() {
+    if (attackTimer) clearTimeout(attackTimer);
+    
+    const delay = CONFIG.ATTACK_INTERVAL_MIN + Math.random() * (CONFIG.ATTACK_INTERVAL_MAX - CONFIG.ATTACK_INTERVAL_MIN) + (firstAttack ? CONFIG.FIRST_ATTACK_DELAY : 0);
+    firstAttack = false;
+    
+    attackTimer = setTimeout(() => {
+      if (gameState.phase === 'question') {
+        launchAttack();
+        scheduleNextAttack();
+      }
+    }, delay);
+  }
+
+  function launchAttack() {
+    const type = ATTACK_TYPES[Math.floor(Math.random() * ATTACK_TYPES.length)];
+    
+    if (type === 'fireball') {
+      createFireball();
+    } else if (type === 'ice') {
+      createIce();
+    } else if (type === 'portal') {
+      createPortal();
+    }
+  }
+
+  function createFireball() {
+    const targetX = gameState.player.x;
+    const targetY = gameState.player.y;
+    
+    const attack = {
+      type: 'fireball',
+      x: BOSS_DATA[gameState.boss].x,
+      y: BOSS_DATA[gameState.boss].y,
+      targetX,
+      targetY,
+      startTime: performance.now(),
+      duration: 3400, // 700ms warn + 2700ms travel (ช้าลงมาก ให้เวลาเดินหลบ)
+      warned: false,
+      hit: false
+    };
+    
+    gameState.attacks.push(attack);
+    
+    // Create DOM
+    const tile = document.createElement('div');
+    tile.className = 'atk-tile fireball';
+    tile.style.left = attack.x + '%';
+    tile.style.top = attack.y + '%';
+    tile.innerHTML = '<img src="assets/boss_fireball.webp" alt="Fireball">';
+    hudElements.attackTiles.appendChild(tile);
+    attack.element = tile;
+    
+    // Warning line
+    const line = document.createElement('div');
+    line.className = 'warn-ring';
+    line.style.left = attack.x + '%';
+    line.style.top = attack.y + '%';
+    const angle = Math.atan2(targetY - attack.y, targetX - attack.x) * 180 / Math.PI;
+    line.style.transform = `rotate(${angle}deg)`;
+    hudElements.attackTiles.appendChild(line);
+    attack.warnElement = line;
+    
+    setTimeout(() => {
+      if (line.parentNode) line.remove();
+    }, 700);
+  }
+
+  function createIce() {
+    const attack = {
+      type: 'ice',
+      drops: [],
+      startTime: performance.now(),
+      duration: 2000, // 800ms warn + 1200ms fall
+      warned: false,
+      hit: false
+    };
+    
+    // Create 3 ice drops
+    for (let i = 0; i < 3; i++) {
+      // สุ่มรอบผู้เล่น (ไม่ซ้ำตำแหน่งเดิม)
+      const x = Math.max(5, Math.min(95, gameState.player.x + (Math.random() - 0.5) * 50));
+      const y = -10; // start above screen
+      const targetY = Math.max(20, Math.min(92, gameState.player.y + (Math.random() - 0.5) * 30)); // ตกใกล้ที่ผู้เล่นยืน
+      
+      const drop = { x, y, targetY };
+      attack.drops.push(drop);
+      
+      // Create DOM
+      const tile = document.createElement('div');
+      tile.className = 'atk-tile ice';
+      tile.style.left = x + '%';
+      tile.style.top = y + '%';
+      tile.innerHTML = '<img src="assets/boss_ice.webp" alt="Ice">';
+      hudElements.attackTiles.appendChild(tile);
+      drop.element = tile;
+      
+      // Warning shadow
+      const shadow = document.createElement('div');
+      shadow.className = 'warn-ring circle';
+      shadow.style.left = x + '%';
+      shadow.style.top = targetY + '%';
+      hudElements.attackTiles.appendChild(shadow);
+      drop.shadowElement = shadow;
+      
+      setTimeout(() => {
+        if (shadow.parentNode) shadow.remove();
+      }, 800);
+    }
+    
+    gameState.attacks.push(attack);
+  }
+
+  function createPortal() {
+    // Spawn ออฟเซตห่างจากผู้เล่น ไม่งั้นโดนทันทีตั้งแต่เกิด
+    const offsetX = (gameState.player.x < 50 ? 1 : -1) * (20 + Math.random() * 10);
+    const offsetY = (gameState.player.y < 50 ? 1 : -1) * (15 + Math.random() * 10);
+    const attack = {
+      type: 'portal',
+      x: Math.max(8, Math.min(92, gameState.player.x + offsetX)),
+      y: Math.max(8, Math.min(92, gameState.player.y + offsetY)),
+      startTime: performance.now(),
+      duration: 3500,
+      warned: false,
+      hit: false,
+      radius: 5 // vw
+    };
+    
+    gameState.attacks.push(attack);
+    
+    // Create DOM
+    const tile = document.createElement('div');
+    tile.className = 'atk-tile portal';
+    tile.style.left = attack.x + '%';
+    tile.style.top = attack.y + '%';
+    tile.innerHTML = '<img src="assets/boss_portal.webp" alt="Portal"><div class="portal-ring"></div>';
+    hudElements.attackTiles.appendChild(tile);
+    attack.element = tile;
+  }
+
+  function updateAttacks(now) {
+    for (let idx = gameState.attacks.length - 1; idx >= 0; idx--) {
+      const attack = gameState.attacks[idx];
+      const elapsed = now - attack.startTime;
+      
+      if (attack.type === 'fireball') {
+        if (elapsed < 700) {
+          // Warning phase
+        } else if (elapsed < attack.duration) {
+          // Travel phase
+          const travelProgress = Math.min(1, (elapsed - 700) / (attack.duration - 700));
+          const x = attack.x + (attack.targetX - attack.x) * travelProgress;
+          const y = attack.y + (attack.targetY - attack.y) * travelProgress;
+          
+          if (attack.element) {
+            attack.element.style.left = x + '%';
+            attack.element.style.top = y + '%';
+          }
+          
+          // Check collision
+          if (!attack.hit && collide(x, y, CONFIG.ATTACK_RADIUS, gameState.player.x, gameState.player.y, CONFIG.PLAYER_RADIUS)) {
+            hitPlayer(attack);
+            attack.hit = true;
+          }
+        } else {
+          // Remove
+          if (attack.element && attack.element.parentNode) attack.element.remove();
+          if (attack.warnElement && attack.warnElement.parentNode) attack.warnElement.remove();
+          
+          // Dodged
+          if (!attack.hit) {
+            onDodge();
+          }
+          
+          gameState.attacks.splice(idx, 1);
+        }
+      }
+      
+      else if (attack.type === 'ice') {
+        if (elapsed < 800) {
+          // Warning phase
+        } else if (elapsed < attack.duration) {
+          // Fall phase
+          const fallProgress = (elapsed - 800) / 1200;
+          
+          attack.drops.forEach(drop => {
+            const y = drop.y + (drop.targetY - drop.y) * fallProgress;
+            
+            if (drop.element) {
+              drop.element.style.top = y + '%';
+            }
+            
+            // Check collision ตอนถึงพื้นจริง (95%+) เท่านั้น
+            if (!attack.hit && fallProgress > 0.93 && collide(drop.x, y, CONFIG.ATTACK_RADIUS, gameState.player.x, gameState.player.y, CONFIG.PLAYER_RADIUS)) {
+              hitPlayer(attack);
+              freezePlayer();
+              attack.hit = true;
+            }
+          });
+        } else {
+          // Remove
+          attack.drops.forEach(drop => {
+            if (drop.element && drop.element.parentNode) drop.element.remove();
+            if (drop.shadowElement && drop.shadowElement.parentNode) drop.shadowElement.remove();
+          });
+          
+          if (!attack.hit) {
+            onDodge();
+          }
+          
+          gameState.attacks.splice(idx, 1);
+        }
+      }
+      
+      else if (attack.type === 'portal') {
+        if (elapsed < 500) {
+          // Warning phase - scale up
+          const scale = elapsed / 500;
+          if (attack.element) {
+            attack.element.style.transform = `translate(-50%, -50%) scale(${scale})`;
+          }
+        } else if (elapsed < attack.duration) {
+          // Active phase
+          const dist = distance(attack.x, attack.y, gameState.player.x, gameState.player.y);
+          
+          if (!attack.hit && dist < attack.radius) {
+            // Player ยังยืนอยู่ในพอร์ทอลตอนกระตุ้น
+            if (elapsed > 3000) {
+              hitPlayer(attack);
+              attack.hit = true;
+            }
+          }
+        } else {
+          // Remove
+          if (attack.element && attack.element.parentNode) attack.element.remove();
+          
+          if (!attack.hit) {
+            onDodge();
+          }
+          
+          gameState.attacks.splice(idx, 1);
+        }
+      }
+    }
+  }
+
+  function hitPlayer(attack) {
+    if (QV.state.energy <= 0) return;
+    
+    QV.state.energy -= CONFIG.ATTACK_DAMAGE;
+    QV.saveState(QV.state);
+    updateHUD();
+    
+    // Visual feedback
+    playerSprite.classList.add('hit');
+    setTimeout(() => playerSprite.classList.remove('hit'), 300);
+    
+    // Knockback
+    const dx = gameState.player.x - (attack.x || gameState.player.x);
+    const dy = gameState.player.y - (attack.y || gameState.player.y);
+    const mag = Math.sqrt(dx ** 2 + dy ** 2) || 1;
+    gameState.player.x += (dx / mag) * 5;
+    gameState.player.y += (dy / mag) * 5;
+    
+    // Clamp
+    gameState.player.x = Math.max(CONFIG.ARENA_BOUNDS.minX, Math.min(CONFIG.ARENA_BOUNDS.maxX, gameState.player.x));
+    gameState.player.y = Math.max(CONFIG.ARENA_BOUNDS.minY, Math.min(CONFIG.ARENA_BOUNDS.maxY, gameState.player.y));
+    
+    updatePlayerPosition();
+    
+    gameState.combo = 0;
+    
+    // Check lose
+    if (QV.state.energy <= 0) {
+      endGame(false);
+    }
+  }
+
+  function freezePlayer() {
+    gameState.player.frozen = true;
+    playerSprite.classList.add('frozen');
+    
+    setTimeout(() => {
+      gameState.player.frozen = false;
+      playerSprite.classList.remove('frozen');
+    }, 1500);
+  }
+
+  function onDodge() {
+    gameState.combo++;
+    QV.state.xp += CONFIG.DODGE_XP;
+    QV.saveState(QV.state);
+    QV.app.toast(`Dodged! +${CONFIG.DODGE_XP} XP`);
+    updateHUD();
+  }
+
+  // ===== QUESTIONS =====
+  function loadQuestion() {
+    const q = gameState.questions[gameState.currentQIdx];
+    if (!q) return;
+    
+    gameState.timer = CONFIG.QUESTION_TIME;
+    gameState.padHoldStart = null;
+    gameState.padHoldIdx = null;
+    
+    // 1. สุ่มตำแหน่งป้ายใหม่จาก 8 slots (กันคนยืนแช่)
+    const availableSlots = shuffleArray([...CONFIG.PAD_SLOTS]);
+    const selectedSlots = availableSlots.slice(0, 4);
+    gameState.padPositions = selectedSlots;
+    
+    // 2. Shuffle answer content
+    const shuffledChoices = q.choices.map((choice, idx) => ({ choice, originalIdx: idx }));
+    const randomized = shuffleArray(shuffledChoices);
+    
+    // 3. Update pads (ตำแหน่ง + เนื้อหา)
+    answerPads.forEach((pad, idx) => {
+      const pos = selectedSlots[idx];
+      const choice = randomized[idx];
+      
+      // อัปเดตพิกัดพร้อม transition (CSS)
+      pad.style.left = pos.x + '%';
+      pad.style.top = pos.y + '%';
+      pad.style.opacity = '1';
+      
+      const content = pad.querySelector('.pad-content');
+      content.innerHTML = QV.formatFrac(choice.choice);
+      pad.dataset.answerIdx = choice.originalIdx;
+      pad.classList.remove('correct', 'wrong', 'holding');
+    });
+    
+    // Update question text
+    hudElements.questionCounter.textContent = `Question ${gameState.currentQIdx + 1} / ${gameState.questions.length}`;
+    hudElements.questionText.innerHTML = QV.formatFrac(q.q);
+    
+    // Hide hint
+    hudElements.hintOverlay.style.display = 'none';
+    
+    // Start timer
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      gameState.timer--;
+      updateTimerBar();
+      
+      if (gameState.timer <= 0) {
+        clearInterval(timerInterval);
+        onAnswerWrong(null); // timeout = wrong
+      }
+    }, 1000);
+    
+    updateTimerBar();
+  }
+
+  function checkPadCollision() {
+    answerPads.forEach((pad, idx) => {
+      const padPos = gameState.padPositions[idx];
+      if (!padPos) return;
+      
+      const dist = distance(gameState.player.x, gameState.player.y, padPos.x, padPos.y);
+      
+      // ความเร็ว player (vw/s) — คำนวณจาก velocity %/s → vw/s
+      const aspect = window.innerHeight / window.innerWidth;
+      const vyVw = Math.abs(gameState.player.vy || 0) * aspect * CONFIG.PLAYER_SPEED;
+      const vxVw = Math.abs(gameState.player.vx || 0) * CONFIG.PLAYER_SPEED;
+      const speedVw = Math.sqrt(vxVw * vxVw + vyVw * vyVw);
+      const isStandingStill = speedVw < CONFIG.MOVING_THRESHOLD;
+      
+      // ตอบเฉพาะตอน: ยืนในแกนกลางป้าย (core) + หยุดยืน (ตั้งใจ)
+      const onCore = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_ANSWER_CORE);
+      const onPad = dist < (CONFIG.PLAYER_RADIUS + CONFIG.PAD_RADIUS);
+      
+      if (onCore && isStandingStill) {
+        // บนแกนกลางป้าย + หยุดยืน = ตั้งใจตอบ
+        if (gameState.padHoldIdx === idx) {
+          const holdTime = performance.now() - gameState.padHoldStart;
+          if (holdTime >= CONFIG.ANSWER_HOLD_TIME) {
+            onAnswer(idx);
+          }
+        } else {
+          gameState.padHoldIdx = idx;
+          gameState.padHoldStart = performance.now();
+          pad.classList.add('holding');
+        }
+      } else if (onPad && !isStandingStill) {
+        // เดินผ่านป้าย — แสดง hint ว่าต้องหยุดยืน
+        if (gameState.padHoldIdx === idx) {
+          gameState.padHoldIdx = null;
+          gameState.padHoldStart = null;
+          pad.classList.remove('holding');
+          pad.classList.add('keep-moving');
+          setTimeout(() => pad.classList.remove('keep-moving'), 400);
+        }
+      } else {
+        // ออกจากป้าย
+        if (gameState.padHoldIdx === idx) {
+          gameState.padHoldIdx = null;
+          gameState.padHoldStart = null;
+          pad.classList.remove('holding');
+        }
+      }
+    });
+  }
+
+  function onAnswer(padIdx) {
+    if (gameState.phase !== 'question') return;
+    
+    const q = gameState.questions[gameState.currentQIdx];
+    const pad = answerPads[padIdx];
+    const answerIdx = parseInt(pad.dataset.answerIdx);
+    
+    // Clear hold
+    gameState.padHoldIdx = null;
+    gameState.padHoldStart = null;
+    answerPads.forEach(p => p.classList.remove('holding'));
+    
+    if (answerIdx === q.answerIdx) {
+      onAnswerCorrect(padIdx);
+    } else {
+      onAnswerWrong(padIdx);
+    }
+  }
+
+  function onAnswerCorrect(padIdx) {
+    if (timerInterval) clearInterval(timerInterval);
+    
+    gameState.combo++;
+    const xp = CONFIG.CORRECT_XP + Math.floor(gameState.combo / 3) * 5;
+    QV.state.xp += xp;
+    // รีวอร์ด: ตอบถูกฟื้นฟูพลังงาน 1 ใจ (max 5)
+    if (QV.state.energy < 5) QV.state.energy = Math.min(5, QV.state.energy + 1);
+    QV.saveState(QV.state);
+    QV.app.toast(`Correct! +${xp} XP`);
+    
+    // Visual feedback
+    if (padIdx !== null) {
+      answerPads[padIdx].classList.add('correct');
+    }
+    
+    // Damage boss
+    gameState.bossHp--;
+    bossTakeDamage();
+    updateHUD();
+    
+    // Check win
+    if (gameState.bossHp <= 0 || gameState.currentQIdx >= gameState.questions.length - 1) {
+      setTimeout(() => endGame(true), 1000);
+    } else {
+      // Next question
+      setTimeout(() => {
+        gameState.currentQIdx++;
+        loadQuestion();
+      }, 1500);
+    }
+  }
+
+  function onAnswerWrong(padIdx) {
+    if (timerInterval) clearInterval(timerInterval);
+    
+    gameState.combo = 0;
+    
+    // Visual feedback
+    if (padIdx !== null) {
+      answerPads[padIdx].classList.add('wrong');
+    }
+    
+    // Show hint
+    const q = gameState.questions[gameState.currentQIdx];
+    if (q.hint) {
+      hudElements.hintOverlay.innerHTML = `💡 Hint: ${QV.formatFrac(q.hint)}`;
+      hudElements.hintOverlay.style.display = 'block';
+      
+      setTimeout(() => {
+        hudElements.hintOverlay.style.display = 'none';
+      }, 3000);
+    }
+    
+    // Damage player
+    QV.state.energy -= CONFIG.ATTACK_DAMAGE;
+    QV.saveState(QV.state);
+    updateHUD();
+    
+    // Visual feedback
+    playerSprite.classList.add('hit');
+    setTimeout(() => playerSprite.classList.remove('hit'), 300);
+    
+    // Check lose
+    if (QV.state.energy <= 0) {
+      endGame(false);
+    } else {
+      // Next question
+      setTimeout(() => {
+        gameState.currentQIdx++;
+        if (gameState.currentQIdx >= gameState.questions.length) {
+          endGame(false);
+        } else {
+          loadQuestion();
+        }
+      }, 2000);
+    }
+  }
+
+  function bossTakeDamage() {
+    if (!bossSprite) return;
+    
+    bossSprite.classList.add('damaged');
+    setTimeout(() => bossSprite.classList.remove('damaged'), 300);
+  }
+
+  // ===== HUD =====
+  function updateHUD() {
+    // Hearts
+    hudElements.hearts.innerHTML = '❤️'.repeat(Math.max(0, QV.state.energy));
+    
+    // Boss HP
+    const hpBars = Array(CONFIG.BOSS_HP).fill(0).map((_, i) => {
+      return `<div class="boss-hp-segment ${i < gameState.bossHp ? 'active' : ''}"></div>`;
+    }).join('');
+    hudElements.bossHpBar.innerHTML = hpBars;
+  }
+
+  function updateTimerBar() {
+    const percent = (gameState.timer / CONFIG.QUESTION_TIME) * 100;
+    hudElements.timerBar.style.width = percent + '%';
+    
+    if (gameState.timer <= 5) {
+      hudElements.timerBar.classList.add('critical');
+    } else {
+      hudElements.timerBar.classList.remove('critical');
+    }
+  }
+
+  // ===== WIN / LOSE =====
+  function endGame(won) {
+    gameState.phase = won ? 'win' : 'lose';
+    
+    // Stop everything — set null ก่อน cancel เพื่อกัน race condition
+    const oldRafId = rafId;
+    rafId = null;
+    if (oldRafId) cancelAnimationFrame(oldRafId);
+    if (attackTimer) clearTimeout(attackTimer);
+    if (timerInterval) clearInterval(timerInterval);
+    attackTimer = null;
+    timerInterval = null;
+    
+    // Clear attacks
+    gameState.attacks.forEach(attack => {
+      if (attack.element && attack.element.parentNode) attack.element.remove();
+      if (attack.warnElement && attack.warnElement.parentNode) attack.warnElement.remove();
+      if (attack.drops) {
+        attack.drops.forEach(drop => {
+          if (drop.element && drop.element.parentNode) drop.element.remove();
+          if (drop.shadowElement && drop.shadowElement.parentNode) drop.shadowElement.remove();
+        });
+      }
+    });
+    gameState.attacks = [];
+    
+    // Show end screen
+    if (won) {
+      const boss = BOSS_DATA[gameState.boss];
+      const badgeId = boss.badgeId;
+      
+      if (!QV.state.badges.includes(badgeId)) {
+        QV.state.badges.push(badgeId);
+      }
+      // บันทึกว่าพิชิตบอสแล้ว (ใช้ในหน้าแผนที่)
+      if (!Array.isArray(QV.state.bossDefeated)) QV.state.bossDefeated = [];
+      if (!QV.state.bossDefeated.includes(gameState.boss)) {
+        QV.state.bossDefeated.push(gameState.boss);
+      }
+      QV.state.xp += CONFIG.WIN_XP;
+      QV.saveState(QV.state);
+      
+      hudElements.endScreen.innerHTML = `
+        <div class="end-content win">
+          <div class="confetti"></div>
+          <h1>🎉 VICTORY! 🎉</h1>
+          <p>You defeated ${boss.name}!</p>
+          <p class="xp-reward">+${CONFIG.WIN_XP} XP</p>
+          <div class="badge-earned">
+            <span style="font-size:2.5rem;">🏆</span>
+            <p>Badge Earned!</p>
+          </div>
+          <button id="btn-end-map" class="btn-primary">Back to Map</button>
+        </div>
+      `;
+      
+      hudElements.endScreen.style.display = 'flex';
+      
+      // Confetti animation
+      createConfetti();
+      
+    } else {
+      QV.state.xp += CONFIG.LOSE_XP;
+      // คืนพลังงาน 1 ใจ เพื่อไม่ให้เกมตัน
+      if (QV.state.energy < 1) QV.state.energy = 1;
+      QV.saveState(QV.state);
+      
+      hudElements.endScreen.innerHTML = `
+        <div class="end-content lose">
+          <h1>💫 Not This Time</h1>
+          <p>Keep practicing and try again!</p>
+          <p class="xp-reward">+${CONFIG.LOSE_XP} XP</p>
+          <button id="btn-end-retry" class="btn-primary">Try Again</button>
+          <button id="btn-end-map" class="btn-secondary">Back to Map</button>
+        </div>
+      `;
+      
+      hudElements.endScreen.style.display = 'flex';
+    }
+    
+    // Event listeners
+    const btnMap = hudElements.endScreen.querySelector('#btn-end-map');
+    const btnRetry = hudElements.endScreen.querySelector('#btn-end-retry');
+    
+    if (btnMap) {
+      btnMap.addEventListener('click', () => {
+        QV.app.show('map');
+      });
+    }
+    
+    if (btnRetry) {
+      btnRetry.addEventListener('click', () => {
+        QV.app.show('boss', { boss: gameState.boss });
+      });
+    }
+  }
+
+  function createConfetti() {
+    const confettiContainer = hudElements.endScreen.querySelector('.confetti');
+    if (!confettiContainer) return;
+    
+    for (let i = 0; i < 50; i++) {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti-piece';
+      confetti.style.left = Math.random() * 100 + '%';
+      confetti.style.animationDelay = Math.random() * 3 + 's';
+      confetti.style.backgroundColor = ['#38BDF8', '#6EE7B7', '#E9A568', '#3B6DFF'][Math.floor(Math.random() * 4)];
+      confettiContainer.appendChild(confetti);
+    }
+  }
+
+  // ===== GAME LOOP =====
+  function gameLoop(timestamp) {
+    if (!rafId || gameState.phase !== 'question') {
+      rafId = null;
+      return;
+    }
+    
+    const deltaTime = lastFrameTime ? (timestamp - lastFrameTime) / 1000 : 0;
+    lastFrameTime = timestamp;
+    
+    // Update player movement
+    updatePlayerMovement(deltaTime);
+    
+    // Update attacks
+    updateAttacks(timestamp);
+    
+    // Check pad collision
+    checkPadCollision();
+    
+    rafId = requestAnimationFrame(gameLoop);
+  }
+
+  // ===== SCREEN API =====
+  function mount(params) {
+    // Clear previous instance ก่อน mount ใหม่ (กัน timer เก่าค้าง)
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (attackTimer) { clearTimeout(attackTimer); attackTimer = null; }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    
+    // Reset state
+    gameState = {
+      boss: params.boss || 'mathos',
+      bossHp: CONFIG.BOSS_HP,
+      questions: getRandomQuestions(10),
+      currentQIdx: 0,
+      timer: CONFIG.QUESTION_TIME,
+      combo: 0,
+      
+      attacks: [],
+      
+      padHoldStart: null,
+      padHoldIdx: null,
+      
+      phase: 'question',
+      
+      player: { x: 57.5, y: 88, vx: 0, vy: 0, facingLeft: false, frozen: false },
+      
+      keys: {},
+      joystick: { active: false, startX: 0, startY: 0, deltaX: 0, deltaY: 0 }
+    };
+    
+    // Create DOM
+    const dom = createDOM(gameState.boss);
+    
+    // Clear and mount
+    const app = document.getElementById('app');
+    app.innerHTML = '';
+    app.appendChild(dom);
+    
+    // Setup input — remove ก่อน add ป้องกัน listener ซ้ำจากการ mount ซ้อน
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('keyup', handleKeyUp);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    setupJoystick();
+    firstAttack = true;
+    
+    // Start game
+    updateHUD();
+    loadQuestion();
+    scheduleNextAttack();
+    
+    lastFrameTime = 0;
+    rafId = requestAnimationFrame(gameLoop);
+  }
+
+  function render(state, params) {
+    // Not used (we use mount directly)
+    return null;
+  }
+
+  function cleanup() {
+    // Stop everything
+    if (rafId) cancelAnimationFrame(rafId);
+    if (attackTimer) clearTimeout(attackTimer);
+    if (timerInterval) clearInterval(timerInterval);
+    
+    // Remove event listeners
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('keyup', handleKeyUp);
+    
+    // Remove DOM ก่อน clear reference
+    if (container && container.parentNode) {
+      container.remove();
+    }
+    
+    // Clear references
+    container = null;
+    bossSprite = null;
+    playerSprite = null;
+    answerPads = [];
+    hudElements = {};
+    
+    rafId = null;
+    attackTimer = null;
+    timerInterval = null;
+  }
+
+  // ลงทะเบียน screen กับ QV
+  if (typeof QV !== 'undefined' && QV.app) {
+    QV.app.screens.boss = { render, mount, cleanup };
+  }
+
+  // เผื่อ debug
+  window.QVBossTest = { mount, loadQuestion };
+
+})();
+

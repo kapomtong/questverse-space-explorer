@@ -5,7 +5,7 @@ const BOSS_CONFIGS = {
     subject: 'math',
     difficulty: 1,
     requiredXP: 0,
-    arenaBg: 'assets/boss_arena.jpg',
+    arenaBg: 'assets/arena_mathos.webp',
     bossImg: 'assets/boss_mathos.webp',
     introCutIn: 'จงพิสูจน์ความสามารถทางคณิตศาสตร์ของเจ้า!',
     victoryMsg: 'เจ้าเข้าใจหลักการคณิตศาสตร์อย่างแท้จริง',
@@ -26,7 +26,7 @@ const BOSS_CONFIGS = {
     subject: 'science',
     difficulty: 2,
     requiredXP: 100,
-    arenaBg: 'assets/boss_arena.jpg',
+    arenaBg: 'assets/arena_chronos.webp',
     bossImg: 'assets/boss_chronos.webp',
     introCutIn: 'เวลาและวิทยาศาสตร์คือกฎของข้า!',
     victoryMsg: 'เจ้าควบคุมเวลาและวิทยาศาสตร์ได้แล้ว',
@@ -122,7 +122,6 @@ const CONFIG = {
   INTENTIONAL_THRESHOLD: 0.15,
   INTENTIONAL_DURATION: 800,
   CAMPING_WARNING_TIME: 4500,
-  WIN_AT: 10, // ตอบถูก 10 ข้อ = ชนะบอส
   FIREBALL_SPEED: 0.25,
   ICE_DURATION: 3000,
   PORTAL_WARP_DELAY: 1500,
@@ -143,7 +142,6 @@ class BossBattle {
       combo: 0,
       questionCount: 0,
       correctStreak: 0,
-      correctCount: 0,
       keys: {},
       joystick: { active: false, dx: 0, dy: 0 },
       pads: [],
@@ -170,7 +168,6 @@ class BossBattle {
     this.onAnswerCallback = options.onAnswer || null;
     this.onTimeUpCallback = options.onTimeUp || null;
     this.rafId = null;
-    this.running = false;
     this.lastTime = 0;
     this.attackTimer = 0;
     this.eventTimer = 0;
@@ -210,27 +207,22 @@ class BossBattle {
       <div class="camping-warning" style="display: none;">⚠️ อย่ายืนนิ่ง!</div>
     `;
     arena.appendChild(hud);
-    // Question bar
-    const qbar = document.createElement('div');
-    qbar.className = 'boss-question-bar';
-    qbar.innerHTML = '<span id="boss-q-text">กำลังโหลดคำถาม...</span>';
-    arena.appendChild(qbar);
 
     // Player
-    const suit = (QV.state && QV.state.player && QV.state.player.suit) || 'red';
     const player = document.createElement('div');
     player.className = 'boss-player';
     player.style.cssText = `
       position: absolute;
-      width: 9vw;
-      max-width: 96px;
+      width: 3vw;
+      height: 3vw;
+      background: radial-gradient(circle, #FFD700, #FFA500);
+      border-radius: 999px;
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      transition: left 0.06s linear, top 0.06s linear;
+      transition: box-shadow 0.3s;
       z-index: 10;
     `;
-    player.innerHTML = `<img src="assets/suit_${suit}.webp" alt="นักผจญภัย" onerror="this.style.display='none'">`;
     arena.appendChild(player);
     this.playerEl = player;
 
@@ -240,18 +232,6 @@ class BossBattle {
     pet.innerHTML = `<img src="assets/pet_mito.webp" alt="Mito" style="width: 100%; height: 100%;">`;
     arena.appendChild(pet);
     this.petEl = pet;
-    // Boss sprite: .boss-roam (inner) carries inline position/transform;
-    // the outer .boss-sprite carries the animation so transforms never collide.
-    const bossSprite = document.createElement('div');
-    bossSprite.className = 'boss-sprite';
-    const bossRoam = document.createElement('div');
-    bossRoam.className = 'boss-roam';
-    bossRoam.innerHTML = `<img src="${this.config.bossImg}" alt="${this.config.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23222%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23aaa%22 font-size=%2248%22%3E👾%3C/text%3E%3C/svg%3E'">`;
-    bossSprite.appendChild(bossRoam);
-    arena.appendChild(bossSprite);
-    this.bossSpriteEl = bossSprite;
-    this.bossRoamEl = bossRoam;
-    this.boss = { t: 0, jitterX: 0, jitterUntil: 0, tauntAt: performance.now() + 5000, attackUntil: 0 };
 
     // Joystick
     const joystick = document.createElement('div');
@@ -288,7 +268,6 @@ class BossBattle {
   }
 
   startBattle() {
-    this.running = true;
     this.loadQuestion();
     this.lastTime = performance.now();
     this.attackTimer = this.config.baseDifficulty.firstAttackDelay;
@@ -373,15 +352,7 @@ class BossBattle {
 
   loadQuestionPool() {
     const subject = this.config.subject;
-    // แมปวิชาของบอส → คีย์ข้อความจริงใน QV.QUESTIONS (โครงสร้างเดิม: ดาว 5 ดวง x โซน)
-    const map = { math: 'numberon', science: 'bionia', thai: 'aksara', english: 'lingua', social: 'civilis' };
-    const planetKey = map[subject] || subject;
-    const planet = QV.QUESTIONS[planetKey] || {};
-    // รวมข้อความทั้งหมดจากทุกโซนของดาวดวงนั้น
-    const questions = [];
-    Object.values(planet).forEach(zoneQs => {
-      if (Array.isArray(zoneQs)) questions.push(...zoneQs);
-    });
+    const questions = QV.questions[subject]?.questions || [];
     this.questionPool = questions.filter(q => !this.usedQuestions.has(q.q));
   }
 
@@ -394,8 +365,6 @@ class BossBattle {
     const q = this.questionPool.splice(Math.floor(Math.random() * this.questionPool.length), 1)[0];
     this.usedQuestions.add(q.q);
     this.gameState.currentQuestion = q;
-    const qText = this.arenaEl.querySelector('#boss-q-text');
-    if (qText) qText.innerHTML = typeof QV.formatFrac === 'function' ? QV.formatFrac(QV.escapeHtml(q.q)) : QV.escapeHtml(q.q);
 
     // Select 4 pad slots
     const slots = this.selectPadSlots();
@@ -529,9 +498,9 @@ class BossBattle {
     let speed = CONFIG.PLAYER_SPEED;
     if (this.gameState.combo >= CONFIG.COMBO_DASH_THRESHOLD) {
       speed *= 1.3;
-      this.playerEl.classList.add('combo-dash');
+      this.playerEl.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.8)';
     } else {
-      this.playerEl.classList.remove('combo-dash');
+      this.playerEl.style.boxShadow = 'none';
     }
 
     this.gameState.player.vx = dx * speed;
@@ -544,19 +513,14 @@ class BossBattle {
     this.gameState.player.x = Math.max(5, Math.min(95, this.gameState.player.x));
     this.gameState.player.y = Math.max(5, Math.min(95, this.gameState.player.y));
 
-    this.playerEl.style.left = `calc(${this.gameState.player.x}% - ${this.playerEl.offsetWidth / 2}px)`;
-    this.playerEl.style.top = `calc(${this.gameState.player.y}% - ${this.playerEl.offsetHeight / 2}px)`;
-    if (this.gameState.player.vx < -0.001) {
-      this.playerEl.style.transform = 'scaleX(-1)';
-    } else if (this.gameState.player.vx > 0.001) {
-      this.playerEl.style.transform = 'scaleX(1)';
-    }
+    this.playerEl.style.left = `${this.gameState.player.x}%`;
+    this.playerEl.style.top = `${this.gameState.player.y}%`;
 
     // Shield visual
     if (this.gameState.player.shielded) {
-      this.playerEl.classList.add('shielded');
+      this.playerEl.style.border = '3px solid cyan';
     } else {
-      this.playerEl.classList.remove('shielded');
+      this.playerEl.style.border = 'none';
     }
   }
 
@@ -622,12 +586,6 @@ class BossBattle {
       this.gameState.score += xp;
       this.gameState.combo++;
       this.gameState.correctStreak++;
-      this.gameState.correctCount = (this.gameState.correctCount || 0) + 1;
-      // ชนะบอส: ตอบถูกครบ WIN_AT ข้อ
-      if (this.gameState.correctCount >= CONFIG.WIN_AT) {
-        this.showVictory();
-        return;
-      }
       if (this.gameState.combo > this.gameState.maxCombo) this.gameState.maxCombo = this.gameState.combo;
 
       // Time Attack: โบนัสเวลา +5 วิ
@@ -636,11 +594,12 @@ class BossBattle {
         const taTimer = this.arenaEl.querySelector('.ta-timer');
         if (taTimer) taTimer.textContent = Math.ceil(this.gameState.timeRemaining) + 's';
         // ตอบครบ 10 ข้อ = ชนะ Time Attack
-                if (this.gameState.questionCount >= 10) {
+        if (this.gameState.questionCount >= 10) {
           this.timeAttackBonus();
           return;
         }
       }
+
       // Combo counter
       const comboEl = this.arenaEl.querySelector('.combo-counter');
       comboEl.style.display = 'block';
@@ -659,8 +618,6 @@ class BossBattle {
         this.gameState.score += 50;
       }
 
-      // บอสสะเทือนถูกทำร้าย
-      this.bossHurt();
       this.loadQuestion();
     } else {
       this.gameState.combo = 0;
@@ -1002,73 +959,8 @@ class BossBattle {
     }
   }
 
-  // ---- อนิเมชันบอสขยับ (roam + ลีลา) ----
-  updateBoss(dt) {
-    if (!this.bossSpriteEl) return;
-    const now = performance.now();
-    const b = this.boss;
-    b.t += dt;
-    const t = b.t / 1000;
-    // เลื่อนซ้าย-ขวาช้าๆ แบบ wave + ลีลาเอียงตามทิศ
-    const swayX = 20 * Math.sin(t / 3.5);
-    const swayY = 1.2 * Math.sin(t / 2.2);
-    const dir = Math.cos(t / 3.5);
-    const tilt = 4 * Math.sin(t / 0.9);
-    const armSwing = 2.2 * Math.sin(t / 0.55);
-    const legBounce = Math.abs(Math.sin(t / 0.9)) * 1.6;
-    // กระชากสั้นๆ (jitter) สุ่มทุก 4-7 วิ
-    let jx = 0;
-    if (now < b.jitterUntil) {
-      jx = b.jitterX * Math.sin((b.jitterUntil - now) / 120);
-    } else if (Math.random() < 0.004) {
-      b.jitterX = (Math.random() - 0.5) * 26;
-      b.jitterUntil = now + 420;
-    }
-    // ลีลา Taunt ชูแขน/โยกแรง สั้นๆ ทุก ~6 วิ
-    let taunt = 0;
-    if (now > b.tauntAt && now < b.tauntAt + 700) {
-      taunt = (1 - (now - b.tauntAt) / 700) * 6;
-    } else if (now > b.tauntAt) {
-      b.tauntAt = now + 5500 + Math.random() * 2500;
-    }
-    // หาวหน้าลุ้นเมื่อยิง projectile (bossLunge)
-    let atk = 0;
-    if (now < b.attackUntil) {
-      atk = (1 - (b.attackUntil - now) / 450) * 14;
-    }
-    const x = 50 + swayX + jx;
-    const y = swayY + taunt + atk + legBounce * 0.4;
-    const rot = tilt + dir * 2;
-    this.bossRoamEl.style.cssText = `bottom: calc(8% - ${y.toFixed(2)}vw); left: ${x.toFixed(2)}%; transform: translateX(-50%) rotate(${rot.toFixed(1)}deg) skewY(${(armSwing * 0.5).toFixed(1)}deg) scaleX(${dir < 0 ? -1 : 1});`;
-    // สถานะ angry เมื่อคอมโบสูง
-    if (this.gameState.combo >= 3) {
-      this.bossSpriteEl.classList.add('angry');
-    } else {
-      this.bossSpriteEl.classList.remove('angry');
-    }
-  }
-  // กระตุ้นให้บอสทำท่าโจมตี (นำหน้า projectile)
-  bossLunge() {
-    if (this.boss) this.boss.attackUntil = performance.now() + 450;
-    if (this.bossSpriteEl) this.bossSpriteEl.classList.add('attacking');
-    if (this.bossAtkTimer) clearTimeout(this.bossAtkTimer);
-    this.bossAtkTimer = setTimeout(() => {
-      if (this.bossSpriteEl) this.bossSpriteEl.classList.remove('attacking');
-    }, 460);
-  }
-  // กระตุ้นให้บอสสะเทือนเมื่อผู้เล่นตอบถูก
-  bossHurt() {
-    if (!this.bossSpriteEl) return;
-    this.bossSpriteEl.classList.remove('damaged');
-    void this.bossSpriteEl.offsetWidth;
-    this.bossSpriteEl.classList.add('damaged');
-    if (this.bossDmgTimer) clearTimeout(this.bossDmgTimer);
-    this.bossDmgTimer = setTimeout(() => {
-      this.bossSpriteEl.classList.remove('damaged');
-    }, 320);
-  }
   gameLoop(timestamp = 0) {
-    if (!this.running) return;
+    if (!this.rafId) return;
     const dt = timestamp - this.lastTime;
     this.lastTime = timestamp;
 
@@ -1086,7 +978,6 @@ class BossBattle {
     if (dt < 100) {
       this.updatePlayer(dt);
       this.updatePet(dt);
-      this.updateBoss(dt);
       this.checkPadCollision();
       this.updateCampingDetection(dt);
       this.updateAttacks(dt);
@@ -1185,7 +1076,6 @@ class BossBattle {
   }
 
   cleanup() {
-    this.running = false;
     if (this.rafId) cancelAnimationFrame(this.rafId);
     if (this.attackTimerId) clearTimeout(this.attackTimerId);
     if (this.eventTimerId) clearTimeout(this.eventTimerId);

@@ -2714,3 +2714,69 @@ body {
 .boss-player.shielded {
   filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.9));
 }
+
+/* ==== Boss living animations (Aug 19) ====
+   โครงสร้าง: .boss-sprite (outer) > .boss-roam (inline transform) > img */
+.boss-sprite {
+    animation: boss-breathe 2.2s ease-in-out infinite;
+}
+@keyframes boss-breathe {
+    0%, 100% { transform: scale(1) translateY(0); }
+    50% { transform: scale(1.02) translateY(-1vw); }
+}
+.boss-sprite.angry img {
+    filter: drop-shadow(0 0 24px rgba(239, 71, 111, 0.85)) hue-rotate(340deg) saturate(1.5) brightness(1.08);
+    animation: boss-angry-pulse 0.8s ease-in-out infinite;
+}
+@keyframes boss-angry-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.045); }
+}
+.boss-sprite.attacking img {
+    filter: drop-shadow(0 0 30px rgba(255, 209, 102, 0.95)) brightness(1.35);
+}
+.boss-sprite.damaged img {
+    animation: boss-hit-flash 0.3s ease-in-out;
+}
+@keyframes boss-hit-flash {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 18px rgba(157, 78, 221, 0.55)); }
+    40% { filter: brightness(2.6) drop-shadow(0 0 32px rgba(255, 209, 102, 0.98)) hue-rotate(-20deg); }
+    70% { filter: brightness(0.65) drop-shadow(0 0 20px rgba(239, 71, 111, 0.9)); }
+}
+@media (max-width: 600px) {
+    .boss-roam { max-width: 120px; }
+}
+
+/* ==== Intro cut-in (บอสปรากฏ) — แดง 3 วิ ==== */
+.intro-cutin {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.82) 100%);
+    transition: opacity 0.5s ease;
+}
+.intro-cutin img {
+    width: min(42vh, 42vw, 380px);
+    height: auto;
+    filter: drop-shadow(0 0 45px rgba(157, 78, 221, 0.9));
+    animation: intro-zoom 3s ease-out;
+}
+@keyframes intro-zoom {
+    0% { transform: scale(1.9) rotate(-6deg); opacity: 0; }
+    25% { transform: scale(1.05) rotate(-1deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.intro-cutin h2 {
+    margin: 14px 0 4px;
+    font-size: clamp(22px, 5vw, 40px);
+    color: #ffd166;
+    text-shadow: 0 0 22px rgba(255, 209, 102, 0.6);
+}
+.intro-cutin p {
+    font-size: clamp(13px, 3vw, 19px);
+    color: #e8e8f0;
+}

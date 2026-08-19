@@ -1,0 +1,4 @@
+Tool execution result saved to: /home/ubuntu/.mcp/tool-results/2026-08-18_16-40-50.588043244_vercel_deploy_to_vercel_54d90692.txt
+MCP structured result captured for host processing.
+Tool execution result summary:
+Error: Deploy failed: Total upload is 25.2 MB, over the 4.0 MB limit. Use git-import or the CLI for large apps.

@@ -1,0 +1,67 @@
+คุณคือ Senior Game Developer (HTML5 + CSS3 + Vanilla JavaScript) จงเขียนระบบเกมใหม่ตามสเปคล่างนี้ โดยอิงจากโค้ดเดิมในโปรเจกต์ /home/ubuntu/questverse-game/ (เกมเดียวกันกับที่คุณแก้ boss.js รอบก่อน)
+
+## บริบทโปรเจกต์
+- ไฟล์หลัก: index.html, style.css (~1886 บรรทัด), js/app.js (SPA router), js/boss.js (boss battle engine เดิม ~1151 บรรทัด — มีระบบ: WASD/joystick, spread answer pads (8 slots สุ่มทุกข้อ, PAD_MIN_DISTANCE), intentional answer (ต้องยืนบน core ป้าย 0.8s), anti-camping (ยืนแช่ 4.5s → warning → targeted fireball), ice/portal attacks, loadQuestion จาก js/questions.js (125 ข้อ 5 วิชา))
+- js/questions.js: questions[subject] = {subject, name, questions:[{q, choices:[], answerIdx, xp}]} — subject keys: math, science, thai, english, social
+- app.js เป็น SPA router: route = {map, boss, boss-hall, ...} — route เดิม "boss" เข้า boss.js mount(root, bossId)
+- CSS เดิมมี: .boss-battle, .answer-pad, .camping-warning, .camping-warning.pulse, .hud, joystick, player-sprite, attacks
+
+## งานที่ต้องทำ (เปลี่ยนโครงสร้างเกม: ยกเลิกระบบดาวเคราะห์/แผนที่)
+
+### 1. หน้าใหม่: Boss Hall (หลักของเกม)
+- Landing page = Boss Hall ไม่ใช่แผนที่ดาวเคราะห์
+- โครงสร้าง: header (โปรไฟล์ผู้เล่น: XP/ยศ/พลังงาน/เลเวลบาร์ + ปุ่มกระดานผู้นำ + ปุ่มรีสตาร์ต + ปุ่มโหมด Time Attack), grid การ์ดบอส 5 ใบ
+- การ์ดบอสแต่ละใบ: ภาพบอส, ชื่อ, วิชา, ระดับความยาก (⭐1-5), XP, หมายเหตุเอกลักษณ์, ปุ่ม "ท้าประจัญ!" — บอสที่ยังไม่ปลดล็อก (ตาม XP) แสดงภาพสลัว + ล็อก
+- เพิ่ม route "boss-hall" ใน app.js และ route แรก (root "") ไป boss-hall
+
+### 2. บอส 5 ตัว (แทน Mathos/Chronos เดิม) — แต่ละตัวมีสนาม/ท่า/ความยากเฉพาะ
+| บอส | วิชา (คำถามจาก questions[subject]) | ภาพ | สนาม | ความยาก |
+|---|---|---|---|---|
+| Mathos the Calculator | math | assets/boss_mathos.webp (เดิม) | assets/arena_mathos.webp (เดิม) | ⭐⭐ |
+| Chronos the Timekeeper | science | assets/boss_chronos.webp (เดิม) | assets/arena_chronos.webp (เดิม) | ⭐⭐⭐ |
+| Kawi the Scribe | thai | assets/boss_kawi.webp | assets/arena_kawi.webp | ⭐⭐⭐ |
+| Lex the Oracle | english | assets/boss_lex.webp | assets/arena_lex.webp | ⭐⭐⭐⭐ |
+| Sage Terra | social | assets/boss_terra.webp | assets/arena_terra.webp | ⭐⭐⭐⭐⭐ |
+
+- เปลี่ยน boss.js เป็น "boss engine" ที่รองรับ CONFIG ต่อตัวบอส: arenaBg (background-image ของสนาม), bossImg, attackThemes (สี/ชื่อ/เอฟเฟกต์ของ fireball/ice/portal ตามบอส), baseDifficulty (ATTACK_INTERVAL, FIRST_ATTACK_DELAY, PLAYER_SPEED ต่อตัว)
+- Intro Cut-in: ก่อนเริ่มสู้ แสดง overlay 3 วินาที: ภาพบอสใหญ่ + ชื่อบอส + คำพูดเฉพาะตัว (ตัวอย่าง: Mathos "ตัวเลขจะเป็นเจ้าของเจ้า!", Kawi "กลอนนี้ มิต้องการให้คุณอ่าน...ให้คุณหลีก!", Lex "อนาคตเขียนด้วยเปลวไฟ...", Terra "อารยธรรมทั้งหมด ย่อมพังทลาย...", Chronos "เวลาไม่เคยรอใคร") — ใช้ web animation (fade+scale) ไม่ต้องใช้ภาพเพิ่ม
+- Victory/Defeat screen เฉพาะบอส: ชนะ = ภาพบอสพ่าย (ใช้ grayscale/opacity ของภาพบอสเดิม + ข้อความ) + XP + Badge เฉพาะบอส; แพ้ = ภาพบอส + คำพูดเยาะเย้ยเฉพาะตัว + ปุ่มแก้ตัว/กลับห้อง
+
+### 3. ไอเทม (item system)
+- หน้าก่อนเข้าสนาม: เลือกไอเทมพกไป 1 ชิ้น — 🛡️โล่ (assets/item_shield.webp): กันดาเมจครั้งแรก 1 ดวง, 🧪ยา (item_potion.webp): ฝืนฟู HP 1 ดวงทุกครั้งที่ตอบถูก 3 ข้อติด, ⚡Boost (item_boost.webp): 10 วินาทีแรกบอสโจมตีช้าลง 40%
+- แสดงไอเทมที่เลือกบน HUD
+- ไอเทมเปิดใช้ฟรีทุกชิ้นตอนนี้ (สะสมด้วย Badge ที่ได้)
+
+### 4. Combo Chain
+- ตอบถูกติด 3 ข้อ → "Comet Dash" โหมด 5 วิ: player เร็วขึ้น 30% + ป้ายคำตอบถูกเรืองแสง border
+- ตอบถูกครบ 10 ข้อไม่ตาย → bonus XP + พลุ confetti (CSS/DOM)
+- combo counter บน HUD
+
+### 5. Event Cards (สุ่มกลางเกม)
+- ทุก 3 ข้อ สุ่ม event 1 ใบ: "พายุอุกกาบาต!" (event_asteroid.webp) — หินตกจากฟ้า 5 ลูกต้องหลบ 4 วิ / "หลุมดำ!" (event_blackhole.webp) — ป้ายดูดเข้าหากัน 6 วิ / "บอสใจดี!" (event_gift.webp) — +HP 1
+- แสดงการ์ด event เปิดตัว 2 วิ (ภาพ + ชื่อไทย) ก่อนเริ่ม effect
+
+### 6. Time Attack (โหมดเสริม)
+- ปุ่มใน Boss Hall: ตอบ 10 ข้อให้เร็วที่สุด มี timer นับถอยหลัง 90 วิ แต่ละคำตอบถูก +5 วิ, XP โบนัสตามเวลาที่เหลือ
+
+### 7. Pet Mito
+- สัตว์เลี้ยง assets/pet_mito.webp ลอยตาม player เสมอ (offset fixed, bobbing animation) ในสนามบอส — แสดงทุกครั้ง
+
+### 8. ระบบปลดล็อกบอส
+- XP 0+: Mathos, 100+: Chronos, 250+: Kawi, 450+: Lex, 700+: Terra — บอสที่พิชิตแล้วเก็บ Badge; การ์ดที่ยังล็อกแสดง ⭐+XP ที่ต้องการ
+- Badge เดิมที่มีใช้ต่อได้ (badge system เดิมใน app.js)
+
+## ข้อกำหนดเทคนิค
+- คงกลไกที่ working อยู่ทั้งหมด: spread pads, intentional answer (0.8s), anti-camping (4.5s → warning → targeted fireball), JOYSTICK TOUCH สำหรับมือถือ
+- เปลี่ยน boss.js ให้เป็น engine รับ config boss เดียว (ใช้ route param bossId) ไม่ลบ logic เดิม
+- ไม่ใช้ library ใหม่, ไม่ใช้ module bundler, ไม่มี backend
+- สร้างไฟล์ใหม่: js/bossHall.js (หน้า Boss Hall + item select UI), js/timeAttack.js (โหมด time attack — ใช้ boss engine ร่วม)
+- สไตล์ CSS ตรงกับ design system เดิม (น้ำเงินเข้ม/ทอง/gradient อวกาศ)
+- ภาษาไทยทั้งเกม
+- คุณสามารถอ่านโค้ดใน /home/ubuntu/questverse-game/ ได้ทุกไฟล์ แต่อย่าแก้ questions.js (คำถามคือข้อมูล static ห้ามสร้างคำถามเอง)
+- ผลลัพธ์: ส่งไฟล์ที่แก้/สร้างใหม่ครบทุกไฟล์ พร้อมคำอธิบายว่าแก้อะไรบ้าง
+
+เริ่มอ่านโค้ดเดิม แล้วเขียนตามลำดับ: (1) boss.js refactor เป็น engine + 5 boss configs, (2) bossHall.js, (3) timeAttack.js, (4) app.js routes, (5) CSS additions — แจ้งชื่อไฟล์ที่ต้องแก้และ code block เต็มของไฟล์ใหม่/ส่วนที่แก้
+
+
+สำคัญมาก: API นี้ไม่มีเครื่องมือใดๆ ให้ใช้ — ห้ามพยายามใช้ tool เด็ดขาด ห้ามอ้างว่าต้อง "อ่านไฟล์" ก่อน จงใช้ข้อมูลที่ผมให้มาใน prompt นี้โดยตรง หากขาดรายละเอียดส่วนไหนให้ประมาณตาม convention ที่มีใน prompt แล้วเขียนโค้ดให้ครบทุกส่วนโดยไม่ขอเพิ่ม ข้อความตอบกลับต้องเป็นโค้ดแบบ Markdown code blocks (```html/css/js) ครบทุกไฟล์

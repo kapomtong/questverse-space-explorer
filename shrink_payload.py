@@ -4,7 +4,7 @@ d = json.load(open('vercel_deploy_input.json'))
 files = d.get('files')
 print('before:', len(files))
 
-skip_dir = {'prompts', 'responses'}
+skip_dir = {'prompts', 'responses', 'opus_out_v2', 'opus_out_v3', 'opus_out_v4', 'opus_out_v5', '__pycache__'}
 skip_names = {
     'DEPLOY_STATE.md', 'UI_UPDATE_PLAN.md', 'PROMPTS_IMAGES.md',
     'make_vercel_payload.py', 'optimize_assets.py', 'clean_edges.py',
@@ -12,6 +12,31 @@ skip_names = {
     'merge_questions.py', 'analyze_parts.py', 'debug_p1.py', 'debug_p2.py',
     'debug_qs.js', 'fix_qv.py', 'read_deploys.py', 'check_deploy_detail.py',
     'find_project.py', 'shrink_payload.py', 'git_push_plan.py',
+    'boss_legacy_backup.js', 'boss_new_base.js', 'bossHall_new_base.js',
+    'timeAttack_new_base.js', 'compress_assets.py', 'webp_assets.py',
+    'png_to_webp_refs.py', 'process_boss_images.py', 'process_assets.py',
+    'call_opus.py', 'parse_opus_blocks.py', 'call_opus_review.py',
+    'merge_boss.py', 'test_img_api.py', 'gen_images.py', 'call_claude.py',
+    'remove_magenta.py', 'check_payload.py', 'qa_all.js', 'qa_questions.js',
+    'repro.js', 'fix_app.js', 'build_questions.py',
+    'boss_lex.png', 'boss_kawi.png', 'boss_terra.png',
+    'arena_kawi.jpg', 'arena_lex.jpg', 'arena_terra.jpg',
+    'item_shield_new.png', 'item_potion.png', 'item_boost.png',
+    'event_asteroid.png', 'event_blackhole.png', 'event_gift.png',
+    'pet_mito.png', 'test_img_api.png',
+    'DEPLOY_STATE.md', 'UI_UPDATE_PLAN.md', 'PROMPTS_IMAGES.md',
+    'QA_MINIGAME.md', 'BOSS_BATTLE_DESIGN.md', 'PROMPTS_BOSS_IMAGES.md',
+    'QA_BOSS_ASSETS.md', 'prompt_opus_boss.txt', 'opus_boss_output.md',
+    'prompt_opus_boss2.txt', 'opus_boss_output2.md', 'QA_BOSS_CODE.md',
+    'merge_boss.py', 'prompt_opus_boss_review.txt',
+    'opus_boss_review_output.md', 'prompt_opus_boss_v3.txt', 'boss_current.js',
+    'opus_boss_v3_output.md', 'OPUS_INTEGRATION_NOTES.md',
+    'TASK_STATE_SPREAD_PADS.md', 'prompt_opus_bossrush.txt',
+    'TASK_STATE_BOSSRUSH.md', 'opus_bossrush_v2.md', 'opus_bossrush_v3.md',
+    'prompt_opus_v2_continuation.txt', 'prompt_opus_v4_files.txt',
+    'opus_bossrush_v4.md', 'prompt_opus_v5_tail.txt', 'opus_bossrush_v5.md',
+    'QA_BOSSRUSH_STATE.md', 'BOSS_RUSH_PLAN.md', 'IMG_API_NOTES.md',
+    'ASSETS_STATUS.md', 'module1.md', 'module1a.md', 'module1b.md',
 }
 
 keep = []

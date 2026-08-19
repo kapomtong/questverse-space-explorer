@@ -1,0 +1,16 @@
+งานสุดท้าย: เขียนโค้ดส่วนท้ายของ boss.js ที่ยังขาด ให้เขียนต่อจากบรรทัดนี้ (หยุดกลาง innerHTML ของ showVictory):
+
+```
+      <button class="btn btn-gold" onclick="QV.app.navigate('boss-hall')">ก
+```
+
+ให้เขียนส่วนที่เหลือของ class BossBattle ครบ ได้แก่:
+1. จบ showVictory() — ปุ่มครบ (กลับบ้าน + รีแมตช์), โบนัส XP + timeLimit โบนัสถ้าเล่น Time Attack, บันทึกลง QV.state (player.xp += victoryXp, badges += boss badge `boss-{id}`, leaderboard.push({name, xp, boss}) sort top 10, selectedItem reset), saveState(), refreshEnergy
+2. showDefeat() — เหมือนกันแต่ข้อความ defeatMsg ของบอส, ปุ่ม "แก้อีกครั้ง" (mount ใหม่) + กลับ hall
+3. mount() — สร้าง DOM (createDOM), โหลดคำถามแรก, แสดง intro cut-in 3 วิ (ภาพบอส + introCutIn + fade/scale animation CSS), เริ่ม gameLoop, เริ่ม firstAttack timer, ถ้า item boost → ช้าลง 40% 10 วิแรก
+4. constructor(root, bossId, options={}) — config = BOSS_CONFIGS[bossId], timeLimit = options.timeLimit || 0, gameState init (player pos 57.5/88, hp 3, xp 0, score 0, combo 0, eventCountdown 3, campingDetection, padPositions [], item = QV.state.selectedItem)
+
+เขียนเฉพาะส่วนนี้ เป็น Markdown code block เดียว จบข้อความทันที ไม่ต้องอธิบาย
+
+
+สำคัญมาก: API นี้ไม่มีเครื่องมือ — ห้ามใช้ tool เด็ดขาด เขียนให้จบครบในข้อความเดียว
