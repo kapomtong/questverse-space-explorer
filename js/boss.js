@@ -217,20 +217,20 @@ class BossBattle {
     arena.appendChild(qbar);
 
     // Player
+    const suit = (QV.state && QV.state.player && QV.state.player.suit) || 'red';
     const player = document.createElement('div');
     player.className = 'boss-player';
     player.style.cssText = `
       position: absolute;
-      width: 3vw;
-      height: 3vw;
-      background: radial-gradient(circle, #FFD700, #FFA500);
-      border-radius: 999px;
+      width: 9vw;
+      max-width: 96px;
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      transition: box-shadow 0.3s;
+      transition: left 0.06s linear, top 0.06s linear;
       z-index: 10;
     `;
+    player.innerHTML = `<img src="assets/suit_${suit}.webp" alt="นักผจญภัย" onerror="this.style.display='none'">`;
     arena.appendChild(player);
     this.playerEl = player;
 
@@ -240,6 +240,13 @@ class BossBattle {
     pet.innerHTML = `<img src="assets/pet_mito.webp" alt="Mito" style="width: 100%; height: 100%;">`;
     arena.appendChild(pet);
     this.petEl = pet;
+    // Boss sprite
+    const bossSprite = document.createElement('div');
+    bossSprite.className = 'boss-sprite';
+    bossSprite.style.cssText = `bottom: 8%; left: 50%; transform: translateX(-50%);`;
+    bossSprite.innerHTML = `<img src="${this.config.bossImg}" alt="${this.config.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23222%22 width=%22200%22 height=%22200%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23aaa%22 font-size=%2248%22%3E👾%3C/text%3E%3C/svg%3E'">`;
+    arena.appendChild(bossSprite);
+    this.bossSpriteEl = bossSprite;
 
     // Joystick
     const joystick = document.createElement('div');
@@ -517,9 +524,9 @@ class BossBattle {
     let speed = CONFIG.PLAYER_SPEED;
     if (this.gameState.combo >= CONFIG.COMBO_DASH_THRESHOLD) {
       speed *= 1.3;
-      this.playerEl.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.8)';
+      this.playerEl.classList.add('combo-dash');
     } else {
-      this.playerEl.style.boxShadow = 'none';
+      this.playerEl.classList.remove('combo-dash');
     }
 
     this.gameState.player.vx = dx * speed;
@@ -532,14 +539,19 @@ class BossBattle {
     this.gameState.player.x = Math.max(5, Math.min(95, this.gameState.player.x));
     this.gameState.player.y = Math.max(5, Math.min(95, this.gameState.player.y));
 
-    this.playerEl.style.left = `${this.gameState.player.x}%`;
-    this.playerEl.style.top = `${this.gameState.player.y}%`;
+    this.playerEl.style.left = `calc(${this.gameState.player.x}% - ${this.playerEl.offsetWidth / 2}px)`;
+    this.playerEl.style.top = `calc(${this.gameState.player.y}% - ${this.playerEl.offsetHeight / 2}px)`;
+    if (this.gameState.player.vx < -0.001) {
+      this.playerEl.style.transform = 'scaleX(-1)';
+    } else if (this.gameState.player.vx > 0.001) {
+      this.playerEl.style.transform = 'scaleX(1)';
+    }
 
     // Shield visual
     if (this.gameState.player.shielded) {
-      this.playerEl.style.border = '3px solid cyan';
+      this.playerEl.classList.add('shielded');
     } else {
-      this.playerEl.style.border = 'none';
+      this.playerEl.classList.remove('shielded');
     }
   }
 

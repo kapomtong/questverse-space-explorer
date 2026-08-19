@@ -91,7 +91,7 @@ QV.screens.character = {
         QV.saveState(QV.state);
 
         // ไปหน้าแผนที่
-        QV.app.show('map');
+        QV.app.show('boss-hall');
       });
     }
 
