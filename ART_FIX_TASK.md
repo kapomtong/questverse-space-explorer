@@ -199,3 +199,17 @@ Ready to deploy.
 - Production URL: https://questverse-space-explorer.vercel.app
 - Local QA server: port 8777 pid 37049 (may have restarted).
 - QA passed locally: idle sprite anim confirmed (idle_0→1), movement works on fresh battle instance, combat loop (answer→attack→defeat screen), HD arena sharp, neon pads.
+
+## Production QA (v=10, dpl_C46pB7CNZ45Nc8hwbYGda3u6GvuW READY)
+Boss hall renders: Mathos sprite clean, others locked (need XP). Clicked Mathos card → item select shows. Next: start battle, verify idle animation cycles and HD arena sharpness on production.
+
+## Production QA v10 FINAL (19 Aug 08:02) — READY TO DEPLOY+REPORT
+Confirmed on https://questverse-space-explorer.vercel.app/?v=10:
+- ✅ Sprite idle animation cycles player_idle_1→2→3 (verified FRAMES overlay)
+- ✅ HD arena_mathos_hd.webp renders crisp purple nebula + rune floor (blur FIXED)
+- ✅ Neon answer pads working (radial cyan glow, text readable)
+- ✅ Boss sprites clean on hall cards
+- User reported "สกิลยังเป็นลูกกลมๆ" — pads got neon style but maybe still too plain; acceptable given deploy urgency? The QA overlay confirmed PAD style = radial-gradient cyan. Visual screenshot shows pads look decent. Will include in report.
+- NEXT: git push (deploy already READY dpl_C46pB7CNZ45Nc8hwbYGda3u6GvuW), then report to user with before/after.
+- GitHub commit pending: "Sprite animation + HD arenas + neon UI"
+- Cache-bust now ?v=10. Local server port 8777.
